@@ -1,0 +1,58 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build wheel and publish GitHub Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Install build dependency
+        run: uv pip install --system build
+
+      - name: Build wheel and sdist
+        run: python -m build
+
+      - name: Verify wheel contains embedded templates
+        run: |
+          python -c "
+          import zipfile, glob, sys
+          wheels = glob.glob('dist/*.whl')
+          assert len(wheels) == 1, f'expected 1 wheel, got {len(wheels)}'
+          with zipfile.ZipFile(wheels[0]) as zf:
+              names = zf.namelist()
+              required = [
+                  'madkit/templates/claude/CLAUDE.md.template',
+                  'madkit/templates/codex/AGENTS.md.template',
+              ]
+              for r in required:
+                  if not any(r in n for n in names):
+                      print(f'MISSING: {r}', file=sys.stderr)
+                      sys.exit(1)
+              cursor_rules = [n for n in names if n.startswith('madkit/templates/cursor/rules/') and n.endswith('.mdc')]
+              assert len(cursor_rules) >= 10, f'expected >=10 cursor rules, got {len(cursor_rules)}'
+              print(f'OK: wheel verified ({len(cursor_rules)} cursor rules)')
+          "
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
+          fail_on_unmatched_files: true

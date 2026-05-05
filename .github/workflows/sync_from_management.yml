@@ -1,0 +1,114 @@
+name: sync-from-management
+
+# Sincroniza templates desde el repo de gestión privado AI-Coding-Resources.
+# Si hay diff, abre PR auto-sync para revisión humana.
+#
+# Requiere secret `MANAGEMENT_REPO_DEPLOY_KEY` (SSH key read-only del repo
+# de gestión). Ver docs/CI_SETUP.md para instrucciones.
+
+on:
+  schedule:
+    - cron: '0 6 * * *'  # diario a las 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    name: Sync from AI-Coding-Resources
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check secret availability
+        id: check
+        env:
+          DEPLOY_KEY: ${{ secrets.MANAGEMENT_REPO_DEPLOY_KEY }}
+        run: |
+          if [ -n "$DEPLOY_KEY" ]; then
+            echo "configured=true" >> $GITHUB_OUTPUT
+          else
+            echo "configured=false" >> $GITHUB_OUTPUT
+            echo "::warning::MANAGEMENT_REPO_DEPLOY_KEY no configurado. Skipping sync. Ver docs/CI_SETUP.md."
+          fi
+
+      - name: Checkout self
+        if: steps.check.outputs.configured == 'true'
+        uses: actions/checkout@v4
+
+      - name: Setup SSH agent
+        if: steps.check.outputs.configured == 'true'
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.MANAGEMENT_REPO_DEPLOY_KEY }}
+
+      - name: Clone management repo (shallow)
+        if: steps.check.outputs.configured == 'true'
+        run: |
+          git clone --depth=1 git@github.com:gmoncor/AI-Coding-Resources.git /tmp/management
+
+      - name: Setup Python
+        if: steps.check.outputs.configured == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Sync claude-templates into wheel
+        if: steps.check.outputs.configured == 'true'
+        run: |
+          set -euo pipefail
+          DST="src/madkit/templates/claude"
+          # Limpia contenido previo (preservando .gitkeep si existe — los re-creamos)
+          find "$DST" -mindepth 1 -delete
+          # Copia archivos del management
+          cp /tmp/management/claude-templates/CLAUDE.md.template "$DST/"
+          for sub in commands agents skills hooks; do
+            if [ -d "/tmp/management/claude-templates/$sub" ]; then
+              cp -r "/tmp/management/claude-templates/$sub" "$DST/"
+            else
+              mkdir -p "$DST/$sub"
+            fi
+            # Garantizar versionado de directorios potencialmente vacíos
+            [ -z "$(ls -A "$DST/$sub" 2>/dev/null)" ] && touch "$DST/$sub/.gitkeep" || true
+          done
+
+      - name: Sanitize template references
+        if: steps.check.outputs.configured == 'true'
+        run: python scripts/sanitize_template_refs.py src/madkit/templates/claude
+
+      - name: Regenerate Cursor and Codex adapters
+        if: steps.check.outputs.configured == 'true'
+        run: python scripts/generate_adapters.py --source /tmp/management --target src/madkit/templates
+
+      - name: Check for diff
+        if: steps.check.outputs.configured == 'true'
+        id: diff
+        run: |
+          git config user.name "madkit-sync-bot"
+          git config user.email "madkit-sync-bot@users.noreply.github.com"
+          git add -A
+          if git diff --staged --quiet; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "Sin cambios — los templates están sincronizados."
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            git diff --staged --stat
+          fi
+
+      - name: Create or update auto-sync PR
+        if: steps.check.outputs.configured == 'true' && steps.diff.outputs.has_changes == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: auto-sync/templates
+          title: "update: sync templates from management repo (auto)"
+          body: |
+            Automated sync from `AI-Coding-Resources/claude-templates/` triggered by `sync_from_management.yml`.
+
+            Steps already executed:
+            - `scripts/sanitize_template_refs.py` (bloquea referencias narrativas al repo privado)
+            - `scripts/generate_adapters.py` (regenera Cursor + Codex)
+
+            Antes de mergear, verifica que CI esté verde y revisa el diff a mano.
+          labels: auto-sync
+          commit-message: "update: sync templates from management repo (auto)"
+          delete-branch: true

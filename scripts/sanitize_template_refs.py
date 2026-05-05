@@ -24,31 +24,48 @@ REPLACEMENTS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"AI-Coding-Resources(?!-)", re.IGNORECASE), "el repo de gestión upstream"),
 ]
 
-# Archivos excluidos del embed (no se sanean, no se distribuyen)
-EXCLUDE_FILES = {"README.md"}
+# Archivos excluidos del embed (no se sanean, no se distribuyen).
+# `sync_upstream.md` actual contiene URLs concretas al repo privado vía `gh api`;
+# se mantiene fuera del wheel hasta que sub-task 084 lo reescriba como wrapper de
+# `madkit sincronizar`. README.md tiene README propio en el wheel.
+EXCLUDE_FILES = {"README.md", "sync_upstream.md"}
 
 
 def sanitize_file(path: Path) -> tuple[bool, list[str]]:
-    """Sanea un archivo. Devuelve (modificado, findings_no_resueltos)."""
+    """Sanea un archivo. Devuelve (modificado, findings_bloqueantes).
+
+    Orden importante:
+    1. Si el archivo está excluido → no tocar, no reportar.
+    2. Si contiene patrón prohibido (URL concreta al repo privado) → BLOQUEA
+       sin modificar. El maintainer debe reescribir o excluir el archivo.
+    3. Si solo tiene menciones narrativas saneables → reemplaza y reporta.
+    """
     if path.name in EXCLUDE_FILES:
         return False, []
 
     content = path.read_text(encoding="utf-8")
-    original = content
 
+    # 1) Bloqueo inmediato si hay URL concreta al repo privado
+    findings: list[str] = []
+    for forbidden in FORBIDDEN_PATTERNS:
+        if forbidden.search(content):
+            findings.append(
+                f"{path}: contiene patrón prohibido {forbidden.pattern!r} "
+                "— excluir del embed o reescribir antes de sincronizar"
+            )
+    if findings:
+        return False, findings
+
+    # 2) Sanea menciones narrativas seguras
+    original = content
     for pattern, replacement in REPLACEMENTS:
         content = pattern.sub(replacement, content)
 
-    findings = []
-    for forbidden in FORBIDDEN_PATTERNS:
-        if forbidden.search(content):
-            findings.append(f"{path}: aún contiene patrón prohibido {forbidden.pattern!r}")
-
     if content != original:
         path.write_text(content, encoding="utf-8")
-        return True, findings
+        return True, []
 
-    return False, findings
+    return False, []
 
 
 def main(templates_root: Path) -> int:
