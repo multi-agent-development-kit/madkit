@@ -45,7 +45,7 @@ jobs:
       - name: Clone management repo (shallow)
         if: steps.check.outputs.configured == 'true'
         run: |
-          git clone --depth=1 git@github.com:gmoncor/AI-Coding-Resources.git /tmp/management
+          git clone --depth=1 git@github.com:gmoncor/AI-Coding-Resources-v2.git /tmp/management
 
       - name: Setup Python
         if: steps.check.outputs.configured == 'true'
