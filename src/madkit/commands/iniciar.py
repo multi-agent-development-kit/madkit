@@ -6,14 +6,19 @@ from pathlib import Path
 import typer
 
 from madkit.adapters.claude import ClaudeAdapter
+from madkit.adapters.codex import CodexAdapter
 from madkit.adapters.cursor import CursorAdapter
 from madkit.adapters.detector import detect_ide
 from madkit.i18n import t
 
 VALID_IDE_OPTIONS = frozenset({"auto", "claude", "cursor", "codex", "all"})
 
-# IDEs implementados en esta versión (alpha). Codex llega en sub-fase C.
-IMPLEMENTED_ADAPTERS = {"claude": ClaudeAdapter, "cursor": CursorAdapter}
+# IDEs implementados en esta versión.
+IMPLEMENTED_ADAPTERS = {
+    "claude": ClaudeAdapter,
+    "cursor": CursorAdapter,
+    "codex": CodexAdapter,
+}
 
 # Subdirectorios de ai_docs/ creados por bootstrap
 AI_DOCS_SUBDIRS = ("core", "tasks", "refs")

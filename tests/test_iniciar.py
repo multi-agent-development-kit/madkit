@@ -156,3 +156,46 @@ def test_iniciar_all_aborts_when_either_already_initialized(tmp_path: Path) -> N
     (tmp_path / ".claude" / "agents").mkdir(parents=True)
     result = runner.invoke(app, ["iniciar", str(tmp_path), "--ide", "all"])
     assert result.exit_code == 1
+
+
+# ---------- --ide=codex ----------------------------------------------------
+
+
+def test_iniciar_codex_creates_agents_md(tmp_path: Path) -> None:
+    result = runner.invoke(app, ["iniciar", str(tmp_path), "--ide", "codex"])
+    assert result.exit_code == 0, result.output
+    assert (tmp_path / "AGENTS.md").exists()
+
+
+def test_iniciar_codex_does_not_create_claude_or_cursor(tmp_path: Path) -> None:
+    result = runner.invoke(app, ["iniciar", str(tmp_path), "--ide", "codex"])
+    assert result.exit_code == 0
+    assert not (tmp_path / "CLAUDE.md").exists()
+    assert not (tmp_path / ".cursor").exists()
+    assert not (tmp_path / ".claude").exists()
+
+
+def test_iniciar_codex_aborts_when_agents_md_exists(tmp_path: Path) -> None:
+    """Consistente con claude/cursor: si detect es True, abort sin --force."""
+    sentinel = "USER-CUSTOM-AGENTS-MD"
+    (tmp_path / "AGENTS.md").write_text(sentinel, encoding="utf-8")
+    result = runner.invoke(app, ["iniciar", str(tmp_path), "--ide", "codex"])
+    assert result.exit_code == 1
+    # El AGENTS.md original debe preservarse intacto
+    assert (tmp_path / "AGENTS.md").read_text(encoding="utf-8") == sentinel
+
+
+def test_iniciar_codex_force_overwrites_existing(tmp_path: Path) -> None:
+    sentinel = "USER-CUSTOM-OLD-CONTENT"
+    (tmp_path / "AGENTS.md").write_text(sentinel, encoding="utf-8")
+    result = runner.invoke(app, ["iniciar", str(tmp_path), "--ide", "codex", "--force"])
+    assert result.exit_code == 0
+    assert (tmp_path / "AGENTS.md").read_text(encoding="utf-8") != sentinel
+
+
+def test_iniciar_all_creates_all_three_scaffoldings(tmp_path: Path) -> None:
+    result = runner.invoke(app, ["iniciar", str(tmp_path), "--ide", "all"])
+    assert result.exit_code == 0, result.output
+    assert (tmp_path / "CLAUDE.md").exists()
+    assert (tmp_path / ".cursor" / "rules").is_dir()
+    assert (tmp_path / "AGENTS.md").exists()
