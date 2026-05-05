@@ -1,0 +1,15 @@
+{
+  "_comment": "Configuración opt-in de los 5 hooks deployables. Copiar a .claude/hooks/config.json del proyecto destino y activar solo los hooks deseados. Ver claude-templates/hooks/README.md para detalles.",
+
+  "context_monitor": true,
+
+  "prompt_guard": {
+    "mode": "advisory"
+  },
+
+  "scaffolding_guard": true,
+
+  "task_doc_validator": true,
+
+  "session_state": true
+}

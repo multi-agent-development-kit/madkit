@@ -1,6 +1,6 @@
 # CLAUDE.md — Template base del proyecto
 
-> Este archivo se copia al raíz del proyecto destino por `/setup_project` y se adapta por `/calibrate_templates`. Contiene guidance transversal para Claude Code: estilo de respuesta, asignación de modelo y delegación a subagentes.
+> Este archivo se copia al raíz del proyecto destino por `madkit iniciar` (recomendado) o `/setup_project` (modo manual con análisis profundo de docs core), y se adapta por `/calibrate_templates`. Contiene guidance transversal para Claude Code: estilo de respuesta, asignación de modelo y delegación a subagentes.
 >
 > **Marcador `[...]`:** los bloques `[entre corchetes]` son placeholders a sustituir durante calibración con valores reales del proyecto.
 
