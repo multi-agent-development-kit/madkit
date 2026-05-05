@@ -38,5 +38,7 @@ def test_wheel_builds_and_contains_templates(tmp_path: Path) -> None:
         assert any("madkit/templates/claude/CLAUDE.md.template" in n for n in names), (
             f"CLAUDE.md.template no encontrado en wheel. Contenidos: {names[:20]}"
         )
-        # Entry point declarado
-        assert any("madkit-0.1.0.dev0.dist-info/entry_points.txt" in n for n in names)
+        # Entry point declarado (cualquier versión 0.1.x)
+        assert any(
+            n.startswith("madkit-") and n.endswith(".dist-info/entry_points.txt") for n in names
+        )

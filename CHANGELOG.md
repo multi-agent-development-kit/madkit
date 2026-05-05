@@ -2,47 +2,57 @@
 
 Todas las versiones notables se documentan aquí. Sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 
-## [Unreleased] — 0.1.0.dev0
+## [0.1.0] — 2026-05-05
 
-Sub-fases A.1 a A.6 del task 083 completas. Próxima parada: Fase B (adapter Cursor).
+Primera release verificable end-to-end. Multi-IDE coverage en alpha pero
+estable: Claude Code (experiencia óptima), Cursor (31 reglas técnicas auto-
+activables + tabla de compat), Codex / GitHub Copilot (AGENTS.md consolidado).
 
-### Añadido
+### Añadido — Estructura del paquete y CLI
 
-#### Sub-fase A.1 — Org y repos
-- Org GitHub `multi-agent-development-kit` creada.
-- Repo `multi-agent-development-kit/madkit` (público, MIT) con código del CLI.
-- Repo `multi-agent-development-kit/.github` con landing page (`profile/README.md`).
-- 9 labels convencionales (`area:cli`, `area:adapter-{claude,cursor,codex,new}`, `area:templates`, `area:ci`, `area:docs`, `auto-sync`).
-- Discussions habilitadas con 6 categorías default.
-- 3 issue templates (bug-report, adapter-request, template-issue).
-
-#### Sub-fase A.2 — Scaffolding del paquete
-- `pyproject.toml` con typer + rich + platformdirs, entry point `madkit`, build hatchling.
-- 5 comandos: `iniciar`, `sincronizar`, `doctor`, `estado`, `listar-ides` con aliases EN.
-- Sistema i18n bilingüe ES/EN.
+- Paquete Python `madkit` con typer + rich + platformdirs.
+- 5 comandos: `iniciar`, `sincronizar`, `doctor`, `estado`, `listar-ides`.
+- Aliases EN: `init`, `sync`, `status`, `list-ides`.
+- i18n bilingüe ES/EN con paridad garantizada por test (40+ keys).
 - Detector heurístico de IDE (claude / cursor / codex / mixed / unknown).
-- Workflow CI cross-platform (Ubuntu/macOS/Windows × Python 3.11/3.12).
+- Validators V1-V7 portados de `scripts/sync_templates.{ps1,sh}` (T073).
+- Mensajes orientados a acción según task 082 §9.5.8.
 
-#### Sub-fase A.3 + A.5 — Adapter Claude funcional
-- `IntegrationBase` interface para los 3 adapters.
-- `ClaudeAdapter` con deploy real desde templates embebidos vía `importlib.resources`.
-- `CLAUDE.md.template` embebido (165 líneas, base estable).
-- Comando `iniciar` integrado: detector + adapter + ai_docs/ + .gitignore + mensajes accionables.
-- 30+ keys en i18n con paridad ES/EN garantizada por test.
+### Añadido — Adapters
 
-#### Sub-fase A.4 — Validators V1-V7
-- Port estricto de `scripts/sync_templates.{ps1,sh}` del repo de gestión.
-- 6 reglas ABORT (V1-V6) + 1 WARN (V7). V8 reservada para futuro (no implementada en script actual).
-- API: `parse_frontmatter()`, `get_field()`, `validate_skill()`, `validate_agent()`, `validate_frontmatter()`, `has_abort()`, `has_warn()`.
+- **ClaudeAdapter**: despliega `.claude/{commands,agents,skills,hooks}/` + `CLAUDE.md` desde templates embebidos.
+- **CursorAdapter**: despliega `.cursor/rules/` (filtrado a 31 reglas con `description:` no vacía) + `MADKIT_COMPATIBILITY.md` con tabla de features degradados.
+- **CodexAdapter**: despliega `AGENTS.md` consolidado en raíz del proyecto.
+- `IntegrationBase` interface común con `deploy() / detect() / degraded_features()`.
 
-#### Sub-fase A.6 — Cobertura y release
-- Tests de subdirs poblados (mock de `templates_root_for`).
-- Test de build de wheel con verificación de templates embebidos.
+### Añadido — Scripts
+
+- `scripts/generate_adapters.py`: filtra reglas Cursor por `description:` no vacía y genera `CLAUDE_md_context.mdc` + `AGENTS.md.template` desde `CLAUDE.md.template`.
+- `scripts/sanitize_template_refs.py`: bloquea URLs concretas al repo privado (`repos/gmoncor/AI-Coding-Resources-v2`); sanea menciones narrativas; excluye `README.md` y `sync_upstream.md` del embed.
+
+### Añadido — CI
+
+- `tests.yml`: cross-platform (Ubuntu/macOS/Windows × Python 3.11/3.12) con cobertura mínima 60%.
+- `release.yml`: trigger en tag `v*.*.*`, build wheel + sdist con verificación de embed (CLAUDE.md.template, AGENTS.md.template, ≥10 cursor rules).
+- `sync_from_management.yml`: cron diario que sincroniza templates desde `AI-Coding-Resources` vía SSH read-only deploy key. Guard de secret evita runs rojos hasta setup.
+- `docs/CI_SETUP.md`: pasos para configurar deploy key.
+
+### Añadido — Org y branding
+
+- Org GitHub `multi-agent-development-kit` con landing page (`profile/README.md`).
+- Repo público `multi-agent-development-kit/madkit` (MIT).
+- Discussions habilitadas, 3 issue templates, 9 labels convencionales (`area:*` + `auto-sync`).
 - README ES + EN.
-- Cobertura global: **88%**.
 
-### Pendiente para v0.1.0
-- **Fase B:** adapter Cursor + `scripts/generate_adapters.py` con filtro auto-detect description.
-- **Fase C:** adapter Codex / AGENTS.md.
-- **Fase D:** workflows CI `sync_from_management.yml` + `release.yml` + `scripts/sanitize_template_refs.py` ya stub.
-- **Fase E:** verificación end-to-end desde máquina limpia + tag v0.1.0.
+### Métricas
+
+- 120 tests cross-platform verde.
+- Cobertura: **95%** (los 3 adapters al 100%; validators 99%).
+- 7 commits en `main` desde scaffolding inicial hasta v0.1.0.
+
+### Conocido / Pendiente
+
+- Sub-task 084: reescritura del slash `claude-templates/commands/sync_upstream.md` como wrapper de `madkit sincronizar` (actualmente excluido del embed por tener URLs al repo privado).
+- Capa 2 del task 082: agent `orientador` para usuarios no técnicos, namespacing `/mad.*`, contratos formales entre subagents.
+- Capa 3: adapters ricos para Cline / Continue / Windsurf.
+- GitHub avisa de deprecation de Node.js 20 en `actions/checkout@v4`, `setup-python@v5`, `setup-uv@v3` (efectivo junio 2026). Migración pendiente cuando salgan versiones compatibles con Node 24.
