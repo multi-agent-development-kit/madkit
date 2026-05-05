@@ -21,13 +21,13 @@ def test_help_es() -> None:
     assert "Multi-Agent" in result.stdout
 
 
-def test_iniciar_stub_returns_zero() -> None:
-    result = runner.invoke(app, ["iniciar", "."])
+def test_iniciar_returns_zero(tmp_path) -> None:
+    result = runner.invoke(app, ["iniciar", str(tmp_path), "--ide", "claude"])
     assert result.exit_code == 0
 
 
-def test_alias_init_works() -> None:
-    result = runner.invoke(app, ["init", "."])
+def test_alias_init_works(tmp_path) -> None:
+    result = runner.invoke(app, ["init", str(tmp_path), "--ide", "claude"])
     assert result.exit_code == 0
 
 

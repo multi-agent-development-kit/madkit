@@ -1,7 +1,7 @@
-"""Internacionalización mínima ES/EN.
+"""Internacionalización ES/EN.
 
-Strings centralizados para todos los comandos. Las sub-fases A.5 + posteriores
-añadirán mensajes orientados a acción (no técnicos) según task 082 §9.5.8.
+Strings centralizados. Mensajes orientados a acción (no técnicos) según
+task 082 §9.5.8.
 """
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ DEFAULT_LANG = "ES"
 
 _STRINGS: dict[str, dict[str, str]] = {
     "ES": {
+        # CLI
         "cli_help": (
             "Multi-Agent Development Kit. Bootstrap, sincronización y validación "
             "de scaffolding multi-IDE para proyectos asistidos por agentes."
@@ -27,8 +28,38 @@ _STRINGS: dict[str, dict[str, str]] = {
         "cmd_listar_ides_help": "Tabla de compatibilidad por IDE.",
         "opt_version_help": "Muestra la versión y termina.",
         "stub_msg": "[stub] Comando aún no implementado. Llegará en una sub-fase posterior.",
+        # iniciar — progreso
+        "init_starting": "Iniciando bootstrap en: {path}",
+        "init_detected_ide": "IDE detectado: {ide}",
+        "init_creating_structure": "Creando estructura ai_docs/...",
+        "init_copying_claude": "Copiando scaffolding Claude Code...",
+        "init_writing_gitignore": "Actualizando .gitignore...",
+        "init_done": "Listo. Próximo paso recomendado:",
+        "init_next_step_claude": "  abre tu proyecto en Claude Code y ejecuta `/setup_project` para análisis de docs.",
+        # iniciar — errores
+        "init_err_path_not_dir": "La ruta '{path}' no es un directorio existente.",
+        "init_err_already_initialized": (
+            "El proyecto ya tiene scaffolding Claude Code en '.claude/'. "
+            "Usa `--force` si quieres sobrescribir (no recomendado)."
+        ),
+        "init_err_ide_unsupported": (
+            "El IDE '{ide}' no está soportado en esta versión. "
+            "Disponibles: claude, cursor, codex, all, auto."
+        ),
+        "init_err_no_templates": (
+            "Los templates Claude Code todavía no están embebidos en este wheel "
+            "(`templates/claude/CLAUDE.md.template` falta). Esta versión es alpha; "
+            "se completarán en la sub-fase D del task 083."
+        ),
+        # detector — labels para el usuario
+        "ide_label_claude": "Claude Code",
+        "ide_label_cursor": "Cursor",
+        "ide_label_codex": "Codex / GitHub Copilot",
+        "ide_label_mixed": "Claude Code + Cursor (mixto)",
+        "ide_label_unknown": "ninguno detectado",
     },
     "EN": {
+        # CLI
         "cli_help": (
             "Multi-Agent Development Kit. Bootstrap, sync and validation of "
             "multi-IDE scaffolding for agent-assisted projects."
@@ -44,6 +75,35 @@ _STRINGS: dict[str, dict[str, str]] = {
         "cmd_listar_ides_help": "Per-IDE compatibility table.",
         "opt_version_help": "Show version and exit.",
         "stub_msg": "[stub] Command not implemented yet. Coming in a later sub-phase.",
+        # iniciar — progress
+        "init_starting": "Starting bootstrap at: {path}",
+        "init_detected_ide": "Detected IDE: {ide}",
+        "init_creating_structure": "Creating ai_docs/ structure...",
+        "init_copying_claude": "Copying Claude Code scaffolding...",
+        "init_writing_gitignore": "Updating .gitignore...",
+        "init_done": "Done. Recommended next step:",
+        "init_next_step_claude": "  open your project in Claude Code and run `/setup_project` for doc analysis.",
+        # iniciar — errors
+        "init_err_path_not_dir": "Path '{path}' is not an existing directory.",
+        "init_err_already_initialized": (
+            "Project already has Claude Code scaffolding under '.claude/'. "
+            "Use `--force` to overwrite (not recommended)."
+        ),
+        "init_err_ide_unsupported": (
+            "IDE '{ide}' is not supported in this version. "
+            "Available: claude, cursor, codex, all, auto."
+        ),
+        "init_err_no_templates": (
+            "Claude Code templates are not yet embedded in this wheel "
+            "(`templates/claude/CLAUDE.md.template` missing). This is an alpha "
+            "release; it will be completed in sub-phase D of task 083."
+        ),
+        # detector — user-facing labels
+        "ide_label_claude": "Claude Code",
+        "ide_label_cursor": "Cursor",
+        "ide_label_codex": "Codex / GitHub Copilot",
+        "ide_label_mixed": "Claude Code + Cursor (mixed)",
+        "ide_label_unknown": "none detected",
     },
 }
 
@@ -53,9 +113,15 @@ def get_lang() -> str:
     return os.environ.get("MADKIT_LANG", DEFAULT_LANG).upper()
 
 
-def t(key: str, lang: str | None = None) -> str:
-    """Traduce una key al idioma activo. Si la key no existe, devuelve la propia key."""
+def t(key: str, lang: str | None = None, **format_kwargs: object) -> str:
+    """Traduce una key al idioma activo. Soporta substitución {placeholder}."""
     selected = (lang or get_lang()).upper()
     if selected not in _STRINGS:
         selected = DEFAULT_LANG
-    return _STRINGS[selected].get(key, key)
+    template = _STRINGS[selected].get(key, key)
+    if format_kwargs:
+        try:
+            return template.format(**format_kwargs)
+        except (KeyError, IndexError):
+            return template
+    return template
