@@ -46,7 +46,7 @@ Esta estructura es **fija** en todos los proyectos del usuario. Los agents la as
 │   ├── refs/          # Referencias externas read-only (gitignored)
 │   └── STATE.md       # (opcional, auto-generado) Breadcrumb del context-monitor hook cuando contexto ≤10%
 ├── .claude/
-│   ├── agents/        # 7 subagents desplegados (ver matriz abajo)
+│   ├── agents/        # 8 subagents desplegados (ver matriz abajo)
 │   ├── commands/      # Slash commands (task_template_*, testing_setup, etc.)
 │   ├── skills/        # Skills en folder/SKILL.md con kebab-case
 │   └── hooks/         # (opcional) Hooks deployables — ver `claude-templates/hooks/README.md`
@@ -71,7 +71,7 @@ Si la estructura difiere en un proyecto concreto (legacy, cliente impuso otra), 
 
 Solo los **subagents** (`.claude/agents/*.md`) cambian de modelo de forma segura — cada subagent abre una sesión aislada con su propio contexto. Las **skills** heredan el modelo del invocador, excepto cuando declaran `context: fork` + `agent: <subagent>` — en ese caso la skill se ejecuta en el fork del subagent especificado (con su modelo, tools, effort).
 
-**Asignación de modelo en los 7 subagents (`.claude/agents/`):**
+**Asignación de modelo en los 8 subagents (`.claude/agents/`):**
 
 | Agent | Modelo | Effort | Por qué |
 |---|---|---|---|
@@ -81,6 +81,7 @@ Solo los **subagents** (`.claude/agents/*.md`) cambian de modelo de forma segura
 | `implementer` | sonnet | high | Ejecuta planes ya triados. Skills pesadas (unit-testing, cleanup*) le delegan vía `context: fork`. |
 | `doc-syncer` | sonnet | high | Sincroniza `ai_docs/core/` con el diff real. Memory: project — acumula patrones entre sesiones. |
 | `researcher` | sonnet | xhigh | Análisis exhaustivo de dependencias y acoplamientos. Reemplaza el built-in Explore. Solo lectura. |
+| `orientador` | sonnet | medium | Detecta el estado del proyecto y sugiere UN solo siguiente paso accionable. Para usuarios no técnicos: activa con "qué hago ahora", "estoy perdido", "ayuda". Tools read-only. |
 | `git-guardian` | haiku | low | Orquesta skills mecánicas (commit, pr, diff, worktree). Sistema de "confianza baja no ejecuta" protege casos complejos. |
 
 **Cómo obtener el cambio de modelo donde importa:**

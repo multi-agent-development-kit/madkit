@@ -90,13 +90,14 @@ Verificar que:
 - [ ] Descriptions bajo ~200 caracteres (alertar si >250)
 - [ ] No hay descriptions duplicadas que causen activación ambigua
 
-**Referencia de modelo esperado en agents** (7 subagents tras task 072, ver `CLAUDE.md` sección "Modelo por perfil de trabajo"):
+**Referencia de modelo esperado en agents** (8 subagents tras tasks 072+085, ver `CLAUDE.md` sección "Modelo por perfil de trabajo"):
 - `task-planner`: opus
 - `reviewer`: opus
 - `adk`: opus
 - `implementer`: sonnet
 - `doc-syncer`: sonnet
 - `researcher`: sonnet
+- `orientador`: sonnet
 - `git-guardian`: haiku
 
 **Skills con `context: fork` + `agent:` esperadas:**

@@ -278,9 +278,9 @@ El frontmatter YAML de skills (`SKILL.md`) y agentes es el mecanismo de auto-act
 - **`name:`** — Identificador interno. NUNCA modificar (controla el routing de Claude Code)
 - **`description:`** — Trigger de activación. NUNCA eliminar. Se puede ENRIQUECER con contexto del proyecto pero manteniendo los triggers originales intactos
 - **`skills:`** — Lista de skills precargadas por agentes (git-guardian, adk). NUNCA eliminar skills de esta lista; se pueden AÑADIR skills adicionales del proyecto
-- **`model:` (SOLO en subagents `.claude/agents/*.md`)** — Asignación de modelo por perfil de trabajo (opus/sonnet/haiku). NUNCA eliminar ni modificar — decisión arquitectónica. Matriz actual (7 subagents):
+- **`model:` (SOLO en subagents `.claude/agents/*.md`)** — Asignación de modelo por perfil de trabajo (opus/sonnet/haiku). NUNCA eliminar ni modificar — decisión arquitectónica. Matriz actual (8 subagents):
   - `task-planner=opus`, `reviewer=opus`, `adk=opus` (planificación / revisión / arquitectura crítica)
-  - `implementer=sonnet`, `doc-syncer=sonnet`, `researcher=sonnet` (ejecución / docs / investigación)
+  - `implementer=sonnet`, `doc-syncer=sonnet`, `researcher=sonnet`, `orientador=sonnet` (ejecución / docs / investigación / orientación a usuarios no técnicos)
   - `git-guardian=haiku` (orquestación mecánica)
   Si el usuario quiere cambiar un modelo por coste, debe hacerse en el repo de plantillas y propagarse vía sync, no por calibración.
 - **`effort:`** — si presente en subagent o skill, CONSERVAR. Es ajuste por perfil de trabajo, no por proyecto.
@@ -498,7 +498,7 @@ grep -rn "logger\.\|logging\.\|console\.\(log\|error\|warn\)" --include="*.py" -
 | `scroll-stop-builder/` | — | — | ✅ | ✅ | — | ✅ |
 | `scroll-stop-web-animations/` | — | — | ✅ | ✅ | — | ✅ |
 
-**Agentes (agents/) — 7 subagents tras task 072:**
+**Agentes (agents/) — 8 subagents tras tasks 072+085:**
 
 | Agente (archivo → name) | Django | Python | TypeScript/Next.js | Web/JS | ADK | WordPress |
 |--------------------------|--------|--------|--------------------|--------|-----|-----------|
@@ -508,12 +508,13 @@ grep -rn "logger\.\|logging\.\|console\.\(log\|error\|warn\)" --include="*.py" -
 | `implementer-agent` → `implementer` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `doc-syncer-agent` → `doc-syncer` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `researcher-agent` → `researcher` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `orientador-agent` → `orientador` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `adk-agent` → `adk` | — | — | — | — | ✅ | — |
 
 **Plantillas universales (conservar siempre):**
 - Comandos: `create_task`, `calibrate_templates`, `create_skill_template`, `setup_project`, `testing_setup`
 - Skills: `bugfix/`, `commit/`, `pr/`, `diff/`, `task-implementation-review/`, `generate-diagram/`, `worktree-management/`, `unit-testing/`, `onboarding/`
-- Agentes: `task-agent`, `reviewer-agent`, `git-guardian-agent`, `implementer-agent`, `doc-syncer-agent`, `researcher-agent`
+- Agentes: `task-agent`, `reviewer-agent`, `git-guardian-agent`, `implementer-agent`, `doc-syncer-agent`, `researcher-agent`, `orientador-agent`
 
 **Acciones:**
 1. Cruzar el stack detectado contra las tres matrices de relevancia (comandos, skills, agentes)
