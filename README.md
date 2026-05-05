@@ -43,17 +43,17 @@ Idioma por defecto: español. `--lang EN` o `MADKIT_LANG=en` cambia a inglés.
 
 ## Compatibilidad por IDE
 
-| Feature | Claude Code | Cursor | Codex / AGENTS.md | Otros |
-|---|---|---|---|---|
-| Skills, subagents, `context: fork`, hooks | Native | No soportado, descritos en `.cursor/rules/CLAUDE_md_context.mdc` | No soportado, listados en AGENTS.md | No soportado |
-| Reglas técnicas linting | No usadas | Native | No aplica | No aplica |
-| Task docs `ai_docs/tasks/` | Native | Universal markdown | Universal | Universal |
+| Feature | Claude Code | Cursor | Codex / AGENTS.md | Cline | Continue | Windsurf |
+|---|---|---|---|---|---|---|
+| Skills, subagents, `context: fork`, hooks | Native | Documentadas como contexto | Listadas en AGENTS.md | Documentadas en `.clinerules` | Listadas en `systemMessage` | Documentadas en `.windsurfrules` |
+| Reglas técnicas linting | No usadas | Native (31 reglas) | No aplica | No aplica | No aplica | No aplica |
+| Task docs `ai_docs/tasks/` | Native | Universal markdown | Universal | Universal | Universal | Universal |
 
-**Claude Code es la experiencia óptima por diseño.** Cursor y Codex reciben adaptadores con degradación documentada — no se intenta paridad imposible.
+**Claude Code es la experiencia óptima por diseño.** Los demás IDEs reciben adaptadores con degradación documentada — no se intenta paridad imposible.
 
 **Requisitos por IDE:**
 - Claude Code: 2026+ para hooks (`PreToolUse`, `PostToolUse`, `SessionStart`).
-- Cursor: cualquier versión moderna.
+- Cursor / Cline / Continue / Windsurf: cualquier versión moderna que consuma su archivo de scaffolding nativo.
 - Codex / GitHub Copilot: cualquier versión que consuma `AGENTS.md`.
 
 ---
