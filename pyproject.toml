@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "madkit"
-version = "0.1.3"
+version = "0.1.4"
 description = "Multi-Agent Development Kit — CLI para scaffolding multi-IDE de proyectos asistidos por agentes."
 readme = "README.md"
 license = { text = "MIT" }

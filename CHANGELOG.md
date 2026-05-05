@@ -2,6 +2,15 @@
 
 Todas las versiones notables se documentan aquí. Sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 
+## [0.1.4] — 2026-05-05
+
+### Cambiado
+
+- Sync automático tras tasks 086+087 del repo de gestión:
+  - **T086 (namespacing conceptual `/mad.*`)**: nuevo `claude-templates/commands/README.md` (categorización de los 14 slash commands en 3 familias mentales `proyecto` / `tarea` / `git`); `CLAUDE.md.template` con bloque "Slash commands por familia" en sección de modelo.
+  - **T087 (bloque `contract:` opcional)**: schema YAML estructurado al final de task docs para handoffs entre subagents — coexiste con cabeceras blockquote y sub-bullets actuales. `task_template.md` §20 con plantilla del bloque. `plan-checker/SKILL.md` Dimension 3 lee `contract.forecast.max_lines` con prioridad sobre el sub-bullet "Tamaño estimado". `task-agent.md` documenta cuándo emitir el bloque.
+- 10 archivos sincronizados desde `claude-templates/`. Sin cambios al código del CLI — solo templates embebidos.
+
 ## [0.1.3] — 2026-05-05
 
 ### Añadido — Capa 3: adapters multi-IDE adicionales (task 088)
