@@ -1,3 +1,10 @@
+> [!IMPORTANT]
+> **Este repo se conserva como referencia histórica.** El desarrollo activo del Multi-Agent Development Kit continúa en **[`multi-agent-development-kit/dev-kit`](https://github.com/multi-agent-development-kit/dev-kit)** — repo unificado con templates de Claude en raíz directa + paquete Python `madkit` (CLI). El paquete sigue publicándose como `madkit` en PyPI (≥0.2.0) sin cambio para usuarios finales.
+>
+> Para nuevas instalaciones y desarrollo: ir al [nuevo repo](https://github.com/multi-agent-development-kit/dev-kit). Issues y discussions también migran allí.
+
+---
+
 # madkit
 
 > Multi-Agent Development Kit. **Loco de nombre. Metódico por diseño.**
