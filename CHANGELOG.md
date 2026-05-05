@@ -2,6 +2,17 @@
 
 Todas las versiones notables se documentan aquí. Sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 
+## [0.1.1] — 2026-05-05
+
+### Cambiado
+
+- Primer sync automático desde el repo de gestión (workflow `sync_from_management.yml` con SSH deploy key configurado): los subdirectorios `templates/claude/{commands,agents,skills,hooks}/` ahora están poblados en el wheel con todos los templates reales (14 commands + 7 agents + 27 skills + 5 hooks). v0.1.0 solo embebía `CLAUDE.md.template`.
+- `madkit iniciar --ide=claude` ahora despliega scaffolding Claude Code completo (no solo `CLAUDE.md`).
+
+### Corregido
+
+- `sync_from_management.yml` línea de clone usaba `gmoncor/AI-Coding-Resources` (sin sufijo); ahora correcto `gmoncor/AI-Coding-Resources-v2`.
+
 ## [0.1.0] — 2026-05-05
 
 Primera release verificable end-to-end. Multi-IDE coverage en alpha pero
