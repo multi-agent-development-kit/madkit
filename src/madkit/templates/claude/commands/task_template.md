@@ -1137,6 +1137,31 @@ Después de crear el documento de tarea, usar la skill de codificación apropiad
 
 ---
 
+## 20. Bloque `contract:` opcional (T087)
+
+Para tareas ESTÁNDAR+ con `depends_on:` declarado o handoffs explícitos entre subagents, añadir al final del task doc un bloque YAML que formaliza los campos críticos para parsing mecánico:
+
+````yaml
+contract:
+  task_id: "NNN"
+  complexity: "ESTÁNDAR"        # SIMPLE | ESTÁNDAR | COMPLEJA | CRÍTICA
+  depends_on: []                 # IDs sin prefijo, sin extensión
+  forecast:
+    min_lines: 0
+    max_lines: 0
+    files_modified: 0
+    files_created: 0
+  wiring:
+    - "ruta/al/archivo (creado|modificado)"
+  produced_by: "task-planner"
+  validated_by: ["plan-checker"]
+  consumed_by: ["implementer", "reviewer", "doc-syncer"]
+````
+
+**Opcional.** Si ausente, plan-checker y demás agents leen las cabeceras blockquote (`> **Depende de:**`, `> **Asunciones:**`) y los sub-bullets ("Tamaño estimado", "Wiring esperado") como hasta T086. Ver detalle del schema en `CLAUDE.md` raíz §3.2 "Bloque `contract:` opcional (T087)".
+
+---
+
 *Versión de Plantilla: 4.0 - Triaje de Ingeniería + Patrones Modernos*
-*Última Actualización: 2026-03-15*
+*Última Actualización: 2026-05-05*
 *Creado Por: Brandon Hancock*

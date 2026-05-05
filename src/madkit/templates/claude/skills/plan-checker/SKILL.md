@@ -69,13 +69,20 @@ Cada paso del Plan debe tener: archivo concreto + acción específica + cómo ve
 
 ### Dimension 3 — Scope vs Forecast (WARNING >400, BLOCKER >800)
 
-**LEER** el sub-bullet `**Tamaño estimado:** [min]-[max] líneas en [N] archivos` de "Impactos esperados" producido por task-planner (T080).
+**LEER** el forecast del task doc en este orden de prioridad:
+
+1. **Bloque `contract:` (T087, prioritario si presente):** parsear el YAML al final del task doc y leer `contract.forecast.max_lines`.
+2. **Sub-bullet narrativo (T080, fallback):** si no hay bloque `contract:`, leer `**Tamaño estimado:** [min]-[max] líneas en [N] archivos` de "Impactos esperados".
+
+Si ambos presentes y discrepan, emitir adicional: `[Dimension 3] WARN — bloque contract.forecast.max_lines (<X>) discrepa con sub-bullet "Tamaño estimado" (<Y>). Usar bloque contract: como source of truth.`
+
+Aplicación de umbrales (sobre el `max_lines` resuelto):
 
 - Si `max <= 400` → OK, sin nota.
 - Si `400 < max <= 800` → **WARNING**: `[Dimension 3] Tamaño estimado <max> líneas excede umbral 400 → recomendación: split via depends_on (ver T079) y stacked PRs (ver skill pr T081)`.
 - Si `max > 800` → **BLOCKER**: `[Dimension 3] Tamaño estimado <max> líneas excede umbral 800 → BLOCKED: split obligatorio en sub-tareas con depends_on declarado, considerar reclasificar como CRÍTICA`.
 
-**SKIPPED si:** "Tamaño estimado" no presente en task doc (T080 no implementado o task-planner antiguo). Emitir `[Dimension 3] SKIPPED — forecast no disponible (T080 no implementado o doc previo)`. Sin penalización.
+**SKIPPED si:** ni bloque `contract:` ni sub-bullet presentes (T080/T087 no implementados o task-planner antiguo). Emitir `[Dimension 3] SKIPPED — forecast no disponible (T080/T087 no implementados o doc previo)`. Sin penalización.
 
 ### Dimension 4 — Scope Reduction Detection (BLOCKER)
 

@@ -99,6 +99,14 @@ systemMessage: |
   
   **Slash commands** (`.claude/commands/*.md`) heredan el modelo de la sesión activa — no soportan `model:` en frontmatter. Para planificación, abrir sesión en Opus antes de invocar `/create_task`, `/task_template_*` o similares.
   
+  ### Slash commands por familia mental (T086)
+  
+  Categorización organizativa para discoverability. Los nombres físicos no cambian:
+  
+  - **Familia `proyecto`** — `/setup_project`, `/sync_upstream`, `/calibrate_templates`, `/testing_setup`.
+  - **Familia `tarea`** — `/create_task`, `/task_template`, `/task_template_{python,typescript,django,php,adk,wordpress}`, `/create_skill_template`, `/adk_orchestrator_template`.
+  - **Familia `git`** — operaciones git como skills auto-activables: `commit`, `pr`, `diff`, `worktree-management` (no son slash commands).
+  
   ---
   
   ## Cuándo delegar a subagentes
