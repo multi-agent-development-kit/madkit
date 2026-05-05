@@ -2,6 +2,17 @@
 
 Todas las versiones notables se documentan aquí. Sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 
+## [0.1.2] — 2026-05-05
+
+### Añadido
+
+- **Agent `orientador`** (sonnet, effort medium) — primer agent de Capa 2 (task 085). Detecta el estado del proyecto y sugiere UN solo siguiente paso accionable cuando el usuario expresa duda sin pedir algo concreto. Activación natural ante "qué hago ahora", "estoy empezando", "no sé por dónde", "ayuda", "estoy perdido", "por dónde empiezo". Tools read-only. Output orientado a acción para usuarios no técnicos: ≤10 líneas, lenguaje sin jerga, una sola sugerencia de comando concreto (madkit iniciar / /setup_project / /task-creator / /status según el estado detectado).
+
+### Cambiado
+
+- Conteo de subagents desplegables: **7 → 8** (sonnet×3 → sonnet×4). Distribución actual: opus×3 (task-planner, reviewer, adk) + sonnet×4 (implementer, doc-syncer, researcher, orientador) + haiku×1 (git-guardian).
+- Conteo de templates: **49 → 50** (14 commands + 27 skills + 8 agents + 1 CLAUDE.md.template).
+
 ## [0.1.1] — 2026-05-05
 
 ### Cambiado
