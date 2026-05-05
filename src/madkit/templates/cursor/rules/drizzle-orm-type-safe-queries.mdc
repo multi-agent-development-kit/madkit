@@ -1,0 +1,127 @@
+---
+description: 
+globs: *.ts,*.tsx
+alwaysApply: false
+---
+# Use Type-Safe Drizzle ORM Query Operators - Avoid Raw SQL Injection
+
+## Context
+Drizzle ORM provides a comprehensive set of type-safe query operators (`eq`, `inArray`, `and`, `or`, etc.) that should be preferred over manually constructed SQL using the `sql` template. Manually building SQL queries can lead to SQL injection vulnerabilities, type safety issues, and reduced code maintainability.
+
+The `sql` template should only be used for complex database-specific functionality that doesn't have a corresponding Drizzle operator, not for basic query operations that have dedicated type-safe alternatives.
+
+## Rule
+1. **Always use Drizzle operators** for basic query operations instead of manually constructing SQL.
+2. **Never use `sql` template** for operations that have dedicated Drizzle operators.
+3. **Import required operators** from `drizzle-orm` instead of building equivalent SQL.
+4. **Only use raw SQL** when no Drizzle operator exists for the specific functionality needed.
+5. **Use `sql<T>`** for type hints when raw SQL is necessary.
+
+## Common Operator Mappings
+| ❌ Bad (Raw SQL) | ✅ Good (Drizzle Operators) |
+|---|---|
+| ```ts sql`${column} = ANY(${array})` ``` | ```ts import { inArray } from "drizzle-orm"; inArray(column, array) ``` |
+| ```ts sql`${column} = ${value}` ``` | ```ts import { eq } from "drizzle-orm"; eq(column, value) ``` |
+| ```ts sql`${col1} > ${val} AND ${col2} < ${val2}` ``` | ```ts import { and, gt, lt } from "drizzle-orm"; and(gt(col1, val), lt(col2, val2)) ``` |
+| ```ts sql`${column} IN (${values.join(',')})` ``` | ```ts import { inArray } from "drizzle-orm"; inArray(column, values) ``` |
+| ```ts sql`${column} IS NULL` ``` | ```ts import { isNull } from "drizzle-orm"; isNull(column) ``` |
+| ```ts sql`${column} LIKE ${pattern}` ``` | ```ts import { like } from "drizzle-orm"; like(column, pattern) ``` |
+
+## Available Drizzle Operators
+**Comparison:** `eq`, `ne`, `gt`, `gte`, `lt`, `lte`  
+**Array Operations:** `inArray`, `notInArray`  
+**Null Checks:** `isNull`, `isNotNull`  
+**Pattern Matching:** `like`, `ilike`, `notIlike`  
+**Range Operations:** `between`, `notBetween`  
+**Logical Operations:** `and`, `or`, `not`  
+**Existence:** `exists`, `notExists`  
+**Array Functions:** `arrayContains`, `arrayContained`, `arrayOverlaps`
+
+## When Raw SQL is Appropriate
+Use `sql` template only for:
+- Database-specific functions not covered by Drizzle operators
+- Complex expressions without Drizzle equivalents
+- Custom database extensions or functions
+
+```ts
+// ✅ Good - Database-specific function
+sql<string>`to_tsvector('simple', ${posts.content})`
+
+// ✅ Good - Complex custom function
+sql<number>`calculate_distance(${lat1}, ${lng1}, ${lat2}, ${lng2})`
+```
+
+## Dynamic Query Building
+For conditional filters, use arrays and spread operator:
+
+```ts
+// ✅ Good - Dynamic conditions
+const conditions = [];
+if (userId) conditions.push(eq(table.userId, userId));
+if (status) conditions.push(eq(table.status, status));
+if (tags.length > 0) conditions.push(inArray(table.tags, tags));
+
+const result = await db
+  .select()
+  .from(table)
+  .where(and(...conditions));
+```
+
+## SQL Injection Prevention
+```ts
+// ❌ Bad - SQL injection risk
+const userInput = "'; DROP TABLE users; --";
+sql`SELECT * FROM users WHERE name = '${userInput}'`
+
+// ✅ Good - Parameterized with Drizzle operator
+eq(users.name, userInput)
+
+// ✅ Good - Parameterized raw SQL when necessary
+sql`SELECT * FROM users WHERE name = ${userInput}`
+```
+
+## Type Safety
+```ts
+// ❌ Bad - No type information
+const result = sql`lower(${users.name})`;
+
+// ✅ Good - With type hint
+const result = sql<string>`lower(${users.name})`;
+
+// ✅ Best - Use Drizzle operator when available
+// (Note: lowercase example, use appropriate operator)
+```
+
+## Examples from Real Code
+```ts
+// ❌ Bad - What caused our recent bug
+sql`${aiModels.id} = ANY(${battleRequest.model_ids})`
+
+// ✅ Good - Type-safe operator
+import { inArray } from "drizzle-orm";
+inArray(aiModels.id, battleRequest.model_ids)
+```
+
+## Required Imports
+Always import the operators you need:
+```ts
+import { 
+  eq, ne, gt, gte, lt, lte,
+  inArray, notInArray,
+  and, or, not,
+  isNull, isNotNull,
+  like, ilike,
+  between, exists
+} from "drizzle-orm";
+```
+
+## Checklist for the Assistant
+- [ ] Check if the query operation has a corresponding Drizzle operator before using `sql` template.
+- [ ] Import required operators from `drizzle-orm`.
+- [ ] Use `inArray()` instead of manually constructing `IN` or `ANY()` clauses.
+- [ ] Use `and()`, `or()` for combining conditions instead of string concatenation.
+- [ ] Only suggest `sql` template for database-specific functions without Drizzle equivalents.
+- [ ] Add `sql<T>` type hints when raw SQL is necessary.
+- [ ] Ensure all user inputs are properly parameterized, never string-interpolated into SQL.
+
+This prevents SQL injection vulnerabilities, maintains type safety, and ensures consistent code patterns across the application.

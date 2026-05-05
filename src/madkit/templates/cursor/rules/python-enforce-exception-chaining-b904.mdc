@@ -1,0 +1,215 @@
+---
+description: 
+globs: *.py
+alwaysApply: false
+---
+# Python Enforce Exception Chaining (B904)
+
+## Context
+Ruff rule B904 catches a critical Python best practice violation: raising exceptions within `except` blocks without proper chaining. This rule ensures that B904 is always enabled and enforced to prevent exception chaining issues from reaching production.
+
+When catching an exception and raising a new one, Python requires explicit chaining to maintain debugging context. Without proper chaining, the original exception context is lost, making debugging significantly harder.
+
+## Rule
+**ALWAYS enable and enforce Ruff rule B904 in Python projects:**
+
+### Required Ruff Configuration
+Ensure your `pyproject.toml` includes B904 in the linting rules:
+```toml
+[tool.ruff.lint]
+select = [
+    "B904",  # Within `except` clause, raise exceptions with `raise ... from err`
+    # ... other rules
+]
+```
+
+### Validation Commands
+Always run B904 check during development and CI:
+```bash
+# Check for exception chaining violations
+uv run --group lint ruff check --select B904 .
+
+# Include in standard linting pipeline
+uv run --group lint ruff check
+```
+
+## Common Violations and Fixes
+
+### ❌ Violation Pattern
+```python
+try:
+    risky_operation()
+except Exception as e:
+    logger.error(f"Operation failed: {e}")
+    # BAD: Original exception context is lost
+    raise CustomError(f"Operation failed: {e}")
+```
+
+### ✅ Correct Pattern
+```python
+try:
+    risky_operation()
+except Exception as e:
+    logger.error(f"Operation failed: {e}")
+    # GOOD: Original exception context is preserved
+    raise CustomError(f"Operation failed: {e}") from e
+```
+
+### ✅ Alternative: Suppress Original Context
+```python
+try:
+    risky_operation()
+except Exception as e:
+    logger.error(f"Operation failed: {e}")
+    # GOOD: Explicitly suppress when original context isn't helpful
+    raise CustomError("User-friendly error message") from None
+```
+
+## Integration with Development Workflow
+
+### Pre-commit Hooks
+Add B904 to your pre-commit configuration:
+```yaml
+# .pre-commit-config.yaml
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.1.0
+    hooks:
+      - id: ruff
+        args: [--select, B904]
+```
+
+### CI/CD Integration
+Include B904 in your CI pipeline:
+```yaml
+# GitHub Actions example
+- name: Check exception chaining
+  run: uv run --group lint ruff check --select B904 .
+```
+
+### IDE Integration
+Configure your IDE to highlight B904 violations:
+- **VS Code**: Ruff extension will automatically highlight violations
+- **PyCharm**: Enable Ruff as external tool
+- **Vim/Neovim**: Configure ruff-lsp
+
+## Common Exception Chaining Patterns
+
+### Service Layer Pattern
+```python
+class DatabaseService:
+    async def store_data(self, data: dict) -> None:
+        try:
+            await self._internal_store(data)
+        except ConnectionError as e:
+            logger.error("Database connection failed", error=str(e))
+            raise DatabaseServiceError("Storage operation failed") from e
+        except ValidationError as e:
+            logger.error("Data validation failed", error=str(e))
+            raise DatabaseServiceError("Invalid data format") from None
+```
+
+### API Error Handling Pattern
+```python
+@app.post("/api/process")
+async def process_data(request: ProcessRequest) -> ProcessResponse:
+    try:
+        result = await processing_service.process(request.data)
+        return ProcessResponse(result=result)
+    except ProcessingServiceError as e:
+        logger.error("Processing failed", error=str(e))
+        # Chain for debugging, but return user-friendly error
+        raise HTTPException(status_code=500, detail="Processing failed") from e
+```
+
+## Enforcement Checklist
+
+### For Developers
+- [ ] Enable B904 in local ruff configuration
+- [ ] Run `ruff check --select B904` before committing
+- [ ] Configure IDE to highlight B904 violations
+- [ ] Never use `# noqa: B904` without justification
+
+### For Code Reviews
+- [ ] Verify all exception raises use proper chaining
+- [ ] Check that `from e` or `from None` is used appropriately
+- [ ] Ensure logging captures original exception details
+- [ ] Confirm no bare `raise CustomError()` in except blocks
+
+### For CI/CD
+- [ ] Include B904 check in linting pipeline
+- [ ] Fail builds on B904 violations
+- [ ] Report B904 violations in PR checks
+- [ ] Track B904 violation metrics
+
+## Why This Matters
+
+### Development Benefits
+- **Better Debugging**: Full exception stack traces available
+- **Easier Troubleshooting**: Original error context preserved
+- **Consistent Error Handling**: Standardized exception patterns
+- **Reduced Support Burden**: More informative error messages
+
+### Production Benefits
+- **Improved Monitoring**: Better error tracking and alerting
+- **Faster Resolution**: Easier to identify root causes
+- **Better User Experience**: More helpful error messages
+- **Reduced Downtime**: Faster debugging and fixes
+
+## Common Mistakes to Avoid
+
+### Don't Suppress B904 Globally
+```toml
+# BAD: Don't disable B904 globally
+[tool.ruff.lint]
+ignore = ["B904"]  # Never do this
+```
+
+### Don't Use Bare Raises in Complex Exception Handling
+```python
+# BAD: Loses context in complex error scenarios
+try:
+    complex_operation()
+except (ValueError, TypeError) as e:
+    if isinstance(e, ValueError):
+        raise CustomError("Value error occurred")  # Missing 'from e'
+    else:
+        raise CustomError("Type error occurred")   # Missing 'from e'
+```
+
+### Don't Chain When Re-raising Same Exception
+```python
+# BAD: Unnecessary chaining when re-raising
+try:
+    operation()
+except ValueError as e:
+    logger.error("Value error", error=str(e))
+    raise e from e  # Redundant, use bare 'raise' instead
+```
+
+## Validation Commands Summary
+
+```bash
+# Check B904 violations only
+uv run --group lint ruff check --select B904 .
+
+# Fix auto-fixable issues (B904 is not auto-fixable)
+uv run --group lint ruff check --fix .
+
+# Check in CI/CD
+uv run --group lint ruff check --select B904 --output-format=github .
+```
+
+## Integration with Existing Rules
+This rule works in conjunction with:
+- `python-proper-exception-chaining.mdc` - Comprehensive exception chaining guidelines
+- `python-automatic-linting-checks.mdc` - Overall linting automation
+- `python-type-annotations-required.mdc` - Type safety requirements
+
+## Maintenance
+- Review B904 violations monthly
+- Update exception chaining patterns as needed
+- Train team on proper exception chaining
+- Monitor false positives and adjust accordingly
+
+This rule ensures that B904 violations are caught automatically, preventing exception chaining issues from reaching production and maintaining high code quality standards.

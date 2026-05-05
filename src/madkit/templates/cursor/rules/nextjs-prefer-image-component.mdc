@@ -1,0 +1,197 @@
+---
+description: 
+globs: *.tsx
+alwaysApply: false
+---
+# Use Next.js Image Component Instead of HTML img Tags
+
+## Context
+The Next.js Image component provides automatic image optimization, performance benefits, and modern web standards that regular HTML `<img>` tags cannot match. Using `<img>` tags directly bypasses critical optimizations that can significantly impact Core Web Vitals, SEO rankings, and user experience.
+
+Regular `<img>` tags lead to:
+- **Poor performance** with no automatic optimization or modern format conversion
+- **Layout shifts** causing poor Cumulative Layout Shift (CLS) scores
+- **Missed optimization opportunities** like lazy loading and responsive sizing
+- **Larger bundle sizes** without automatic WebP/AVIF conversion
+- **Poor mobile experience** without responsive image generation
+
+## Rule
+1. **Never use** HTML `<img>` tags in Next.js applications.
+2. **Always use** the `Image` component from `next/image` for all images.
+3. **Import properly** using `import Image from 'next/image'`.
+4. **Configure required props** (`src`, `alt`, and size information).
+5. **Use `priority`** for above-the-fold images that impact LCP.
+6. **Configure `remotePatterns`** in `next.config.js` for external images.
+
+## Examples
+| ❌ Bad (HTML img tags) | ✅ Good (Next.js Image) |
+|---|---|
+| ```tsx
+<img 
+  src="/hero.jpg" 
+  alt="Hero image"
+  width="800"
+  height="600"
+/>
+``` | ```tsx
+import Image from 'next/image';
+
+<Image
+  src="/hero.jpg"
+  alt="Hero image"
+  width={800}
+  height={600}
+  priority
+/>
+``` |
+| ```tsx
+<img 
+  src="https://example.com/photo.jpg"
+  alt="External photo"
+  style={{ width: '100%' }}
+/>
+``` | ```tsx
+import Image from 'next/image';
+
+<Image
+  src="https://example.com/photo.jpg"
+  alt="External photo"
+  width={800}
+  height={600}
+  sizes="100vw"
+  style={{
+    width: '100%',
+    height: 'auto',
+  }}
+/>
+``` |
+
+## Key Benefits of Next.js Image Component
+
+**Performance Optimizations:**
+- **Automatic format conversion** to WebP/AVIF for 60-70% smaller file sizes
+- **Responsive image generation** with automatic srcset creation
+- **Lazy loading by default** for below-the-fold images
+- **Smart caching** with optimized cache headers (`max-age=31536000, immutable`)
+
+**Core Web Vitals Improvements:**
+- **Prevents layout shift** (CLS) with proper sizing
+- **Improves LCP** with priority loading for critical images
+- **Better FCP** through optimized loading strategies
+
+**Developer Experience:**
+- **Automatic size detection** for static imports
+- **Built-in error handling** and fallback support
+- **TypeScript support** with proper type definitions
+
+## Required Props and Best Practices
+
+### For Static Images
+```tsx
+import Image from 'next/image';
+import heroImage from '/public/hero.jpg';
+
+<Image
+  src={heroImage}
+  alt="Descriptive alt text"
+  priority // For above-the-fold images
+  placeholder="blur" // Automatic blur placeholder
+/>
+```
+
+### For Remote Images
+```tsx
+<Image
+  src="https://example.com/image.jpg"
+  alt="Descriptive alt text"
+  width={800}
+  height={600}
+  sizes="(max-width: 768px) 100vw, 50vw"
+/>
+```
+
+### For Responsive Images
+```tsx
+<div style={{ position: 'relative', width: '100%', height: '400px' }}>
+  <Image
+    src="/responsive-image.jpg"
+    alt="Responsive image"
+    fill
+    sizes="(max-width: 768px) 100vw, 50vw"
+    style={{ objectFit: 'cover' }}
+  />
+</div>
+```
+
+## Configuration for External Images
+
+When using external images, configure `remotePatterns` in `next.config.js`:
+
+```js
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'example.com',
+        port: '',
+        pathname: '/images/**',
+      },
+    ],
+  },
+};
+
+module.exports = nextConfig;
+```
+
+## Common Use Cases
+
+| Image Type | Configuration | Example |
+|---|---|---|
+| **Hero Images** | `priority={true}`, high quality | Above-the-fold banners |
+| **Product Images** | `placeholder="blur"`, responsive | E-commerce galleries |
+| **Avatars** | Fixed dimensions, error handling | User profile photos |
+| **Background Images** | `fill`, `object-fit` properties | Section backgrounds |
+| **Thumbnails** | Lower quality, lazy loading | Image grids and lists |
+
+## Performance Impact
+
+Using Next.js Image instead of regular img tags typically provides:
+- **40%+ improvement** in Largest Contentful Paint (LCP)
+- **60-70% reduction** in image payload size
+- **Elimination of layout shifts** (CLS near zero)
+- **Better Lighthouse scores** (often 20+ point improvement)
+- **Improved mobile performance** with responsive images
+
+## Accessibility Considerations
+
+```tsx
+// ✅ Always provide descriptive alt text
+<Image
+  src="/product.jpg"
+  alt="Blue cotton t-shirt with round neck, size medium"
+  width={400}
+  height={400}
+/>
+
+// ✅ Use empty alt for decorative images
+<Image
+  src="/decorative-border.svg"
+  alt=""
+  width={100}
+  height={20}
+  aria-hidden={true}
+/>
+```
+
+## Checklist for the Assistant
+- [ ] Always suggest `Image` from `next/image` instead of `<img>` tags.
+- [ ] Ensure proper props are provided (`src`, `alt`, and sizing).
+- [ ] Recommend `priority={true}` for above-the-fold images.
+- [ ] Suggest appropriate `sizes` prop for responsive images.
+- [ ] Include `remotePatterns` configuration for external images.
+- [ ] Emphasize performance and accessibility benefits.
+- [ ] Provide blur placeholders for better UX when appropriate.
+
+This ensures optimal image performance, better Core Web Vitals scores, and superior user experience in all Next.js applications.

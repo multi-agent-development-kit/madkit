@@ -1,0 +1,135 @@
+---
+description: 
+globs: *.tsx
+alwaysApply: false
+---
+# Prefer shadcn/ui Components Over Custom or Third-Party Alternatives
+
+## Context
+shadcn/ui provides a comprehensive collection of beautifully designed, accessible, and fully-featured React components. These components are built on top of Radix UI primitives and styled with Tailwind CSS, ensuring consistency, accessibility, and proper theming integration.
+
+Building custom components or importing third-party libraries when shadcn/ui equivalents exist leads to:
+- **Inconsistent design** that doesn't follow the established design system
+- **Missing accessibility features** that shadcn components provide by default
+- **Theming conflicts** that don't integrate with the project's dark/light mode
+- **Duplicate functionality** that increases bundle size and maintenance overhead
+- **Lost integration benefits** like proper CSS variable usage and responsive design
+
+## Rule
+1. **FIRST: Check existing components** in `@/components/ui/` directory to see what's already available in the project.
+2. **SECOND: Check shadcn/ui** before implementing custom UI components or importing third-party UI libraries.
+3. **Use existing shadcn components** for all common UI patterns: buttons, cards, dialogs, forms, navigation, layouts, feedback (toasts), data display, etc.
+4. **Install missing shadcn components** using `npx shadcn@latest add <component>` rather than building custom alternatives.
+5. **NEVER import Radix UI primitives directly** (e.g., `@radix-ui/react-alert-dialog`, `@radix-ui/react-dialog`) - always use the shadcn/ui wrapper components instead.
+6. **NEVER create duplicate components** if equivalent functionality already exists in `@/components/ui/`.
+7. **When a third-party library is needed** (e.g., for specialized functionality), check if shadcn provides an integrated wrapper first.
+8. **Only build custom components** when shadcn/ui genuinely lacks the required functionality and no suitable alternative exists.
+
+## Available shadcn/ui Components
+Common components that should always be preferred:
+
+**Feedback & Communication:**
+- `alert` - Alert messages and notifications
+- `toast` - Toast notifications (wraps sonner with theming)
+- `sonner` - Advanced toast notifications with full theming
+- `alert-dialog` - Confirmation and alert dialogs
+- `dialog` - Modal dialogs and overlays
+
+**Forms & Input:**
+- `button` - All button variants and states
+- `input` - Text inputs with proper styling
+- `textarea` - Multi-line text input
+- `select` - Dropdown selection
+- `checkbox` - Checkbox inputs
+- `label` - Form labels
+
+**Layout & Navigation:**
+- `card` - Content containers
+- `sheet` - Slide-out panels and drawers
+- `sidebar` - Navigation sidebars
+- `breadcrumb` - Navigation breadcrumbs
+- `separator` - Visual dividers
+
+**Data Display:**
+- `badge` - Status indicators and labels
+- `progress` - Progress bars
+- `skeleton` - Loading placeholders
+- `table` - Data tables
+
+## Examples
+| ❌ Bad (custom/third-party) | ✅ Good (shadcn/ui) |
+|------------------------------|---------------------|
+| ```tsx
+// Custom toast implementation
+import toast from 'react-hot-toast';
+toast.success('Success!');
+``` | ```tsx
+// Use shadcn's sonner integration
+import { toast } from "sonner";
+toast.success('Success!');
+// + Add <Toaster /> from @/components/ui/sonner to layout
+``` |
+| ```tsx
+// Third-party modal library  
+import Modal from 'react-modal';
+<Modal isOpen={open}>Content</Modal>
+``` | ```tsx
+// Use shadcn dialog
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+<Dialog open={open}>
+  <DialogContent>Content</DialogContent>
+</Dialog>
+``` |
+| ```tsx
+// Custom button component
+const CustomButton = ({ children, variant, ...props }) => (
+  <button className={`btn ${variant}`} {...props}>
+    {children}
+  </button>
+);
+``` | ```tsx
+// Use shadcn button
+import { Button } from "@/components/ui/button";
+<Button variant="outline">Click me</Button>
+``` |
+| ```tsx
+// Building custom card layout
+<div className="border rounded-lg p-4 shadow">
+  <h3 className="font-bold">Title</h3>
+  <p>Content</p>
+</div>
+``` | ```tsx
+// Use shadcn card
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+<Card>
+  <CardHeader>
+    <CardTitle>Title</CardTitle>
+  </CardHeader>
+  <CardContent>Content</CardContent>
+</Card>
+``` |
+| ```tsx
+// ❌ NEVER: Import Radix UI directly
+import * as AlertDialog from "@radix-ui/react-alert-dialog";
+import { AlertDialogPrimitive } from "@radix-ui/react-alert-dialog";
+``` | ```tsx
+// ✅ Use shadcn wrapper or install if missing
+import { AlertDialog, AlertDialogContent } from "@/components/ui/alert-dialog";
+// Or install: npx shadcn@latest add alert-dialog
+``` |
+
+## Integration Benefits
+Using shadcn/ui components provides automatic:
+- **Theme integration** - Respects light/dark mode and CSS variables
+- **Responsive design** - Mobile-first responsive behavior
+- **Accessibility** - ARIA labels, keyboard navigation, screen reader support
+- **Type safety** - Full TypeScript definitions and IntelliSense
+- **Consistency** - Unified design language across the application
+
+## Checklist for the Assistant
+- [ ] Before suggesting custom UI components, check if shadcn/ui has an equivalent.
+- [ ] When users need UI functionality, recommend the appropriate shadcn component first.
+- [ ] If a shadcn component doesn't exist, suggest installing it with `npx shadcn@latest add <component>`.
+- [ ] When third-party libraries are needed, check if shadcn provides an integrated wrapper (like sonner).
+- [ ] Only suggest custom components when shadcn/ui genuinely lacks the required functionality.
+- [ ] Always mention the integration benefits (theming, accessibility, consistency) when recommending shadcn components.

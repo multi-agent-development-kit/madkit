@@ -1,0 +1,50 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Use package.json Scripts for Drizzle Operations
+
+## Context
+This project has specific package.json scripts configured for Drizzle ORM operations that include proper environment variable loading via `dotenv-cli`. Using `npx drizzle-kit` commands directly bypasses the configured environment setup and can cause database connection issues or use wrong environment variables.
+
+The project uses a specific setup with `.env.local` file loading and environment-specific configurations that are only properly loaded through the npm scripts.
+
+## Rule
+1. **Never use** direct `npx drizzle-kit` commands in terminal operations.
+2. **Always use** the corresponding package.json scripts for Drizzle operations.
+3. **Environment Loading**: The scripts ensure `.env.local` is properly loaded via `dotenv-cli`.
+
+## Command Mappings
+| ❌ Bad (Direct Commands) | ✅ Good (Package.json Scripts) |
+|---|---|
+| `npx drizzle-kit generate` | `npm run db:generate` |
+| `npx drizzle-kit generate --custom` | `npm run db:generate:custom` |
+| `npx drizzle-kit studio` | `npm run db:studio` |
+| Direct migration scripts | `npm run db:migrate` |
+| Direct rollback scripts | `npm run db:rollback` |
+
+## Available Scripts
+- **`npm run db:generate`** - Generate migrations from schema changes
+- **`npm run db:generate:custom`** - Generate custom migrations
+- **`npm run db:migrate`** - Run pending migrations
+- **`npm run db:rollback`** - Rollback last migration
+- **`npm run db:status`** - Check migration status
+- **`npm run db:check`** - Verificar conflictos de migraciones
+- **`npm run db:studio`** - Open Drizzle Studio
+- **`npm run db:seed`** - Run database seeding
+
+## Why This Matters
+- **Environment Variables**: Scripts load `.env.local` properly
+- **Consistency**: All team members use same commands
+- **Error Prevention**: Avoids database connection issues
+- **Configuration**: Respects project-specific drizzle config
+
+## Checklist for the Assistant
+- [ ] Never suggest direct `npx drizzle-kit` commands.
+- [ ] Always use `npm run db:*` scripts for database operations.
+- [ ] When generating migrations, use `npm run db:generate`.
+- [ ] When running migrations, use `npm run db:migrate`.
+- [ ] Check `package.json` scripts section for available commands.
+
+This ensures proper environment loading and consistent database operations across the project.

@@ -1,0 +1,68 @@
+---
+description: 
+globs: *.tsx
+alwaysApply: false
+---
+# No Inline Styles - Use `cn()` with Conditional Tailwind Classes
+
+## Context
+Mixing `className` and `style` attributes creates inconsistent styling approaches and makes code harder to maintain. Inline styles bypass Tailwind's design system and can't benefit from its responsive breakpoints, dark mode variants, or other utilities.
+
+When dynamic styling is needed (e.g., positioning based on component state), it's better to use conditional Tailwind classes with the `cn()` utility rather than inline styles.
+
+## Rule
+1. **Never use** inline `style` attributes alongside `className` in React components.
+2. For **static values**, use Tailwind's arbitrary value syntax (e.g., `pb-[calc(9rem+2vh)]`).
+3. For **dynamic/conditional values**, use the `cn()` utility with conditional Tailwind classes.
+4. Import `cn` from `@/lib/utils` when needed.
+
+## Examples
+| ❌ Bad (mixed className + style) | ✅ Good (cn with conditional classes) |
+|----------------------------------|---------------------------------------|
+| ```tsx
+<div
+  className="fixed bottom-0 right-0 z-50"
+  style={{ left: leftPosition }}
+>
+``` | ```tsx
+<div
+  className={cn(
+    "fixed bottom-0 right-0 z-50",
+    isMobile ? "left-0" : state === "collapsed" ? "left-16" : "left-64"
+  )}
+>
+``` |
+| ```tsx
+<div
+  className="h-full w-full overflow-y-auto"
+  style={{ paddingBottom: "calc(9rem + 2vh)" }}
+>
+``` | ```tsx
+<div className="h-full w-full overflow-y-auto pb-[calc(9rem+2vh)]">
+``` |
+
+## Dynamic Positioning Pattern
+For components that need dynamic positioning based on state:
+
+```tsx
+// ❌ Bad - using inline styles
+const leftPosition = isMobile ? "0" : state === "collapsed" ? "4rem" : "16rem";
+<div style={{ left: leftPosition }} />
+
+// ✅ Good - using cn with conditional classes
+<div
+  className={cn(
+    "base-classes",
+    isMobile ? "left-0" : state === "collapsed" ? "left-16" : "left-64"
+  )}
+/>
+```
+
+## Checklist for the Assistant
+- [ ] Never suggest using inline `style` attributes alongside `className`.
+- [ ] Use Tailwind's arbitrary value syntax for static calculated values.
+- [ ] Use `cn()` utility with conditional classes for dynamic values.
+- [ ] Import `cn` from `@/lib/utils` when adding conditional styling.
+- [ ] Convert existing mixed className/style patterns to pure Tailwind approaches.
+
+This ensures consistent styling approaches and leverages Tailwind's full feature set.

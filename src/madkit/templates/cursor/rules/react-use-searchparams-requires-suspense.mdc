@@ -1,0 +1,55 @@
+---
+description: 
+globs: *.tsx
+alwaysApply: false
+---
+# Wrap Client Components Using `useSearchParams()` in `<Suspense>`
+
+## Context
+In the Next.js App Router, the hook `useSearchParams()` triggers a **client-side rendering bailout** unless the component that calls it is rendered inside a React `<Suspense>` boundary.  Omitting the boundary leads to build-time failures such as:
+
+```
+useSearchParams() should be wrapped in a suspense boundary
+```
+
+## Rule
+1. Any **Client Component** (i.e. file containing `'use client'`) that calls `useSearchParams()` **must** be rendered within a `<Suspense>` boundary.
+2. The boundary can live in a parent **Server Component** or another Client Component, but it **must** directly wrap the component that uses the hook.
+3. Provide an appropriate `fallback` prop to avoid layout shifts.
+
+## Examples
+| ❌ Bad | ✅ Good |
+|--------|---------|
+| ```tsx
+  // app/(auth)/reset-password/confirm/page.tsx
+  'use client';
+  import { useSearchParams } from 'next/navigation';
+  export default function Confirm() {
+    const params = useSearchParams();
+    // ...
+  }
+  ``` | ```tsx
+  // app/(auth)/reset-password/confirm/Confirm.tsx (Client Component)
+  'use client';
+  import { useSearchParams } from 'next/navigation';
+  export default function Confirm() {
+    const params = useSearchParams();
+    // ...
+  }
+
+  // app/(auth)/reset-password/confirm/page.tsx (Server Component)
+  import { Suspense } from 'react';
+  import Confirm from './Confirm';
+  export default function ConfirmPage() {
+    return (
+      <Suspense fallback={<p>Loading...</p>}>
+        <Confirm />
+      </Suspense>
+    );
+  }
+  ``` |
+
+## Checklist for the Assistant
+- [ ] When a component uses `useSearchParams()`, ensure your guidance wraps it in `<Suspense>` with a `fallback`.
+- [ ] Never suggest using `useSearchParams()` in a Client Component without a Suspense boundary.
+- [ ] Verify that pages/layouts continue to compile without the CSR-bailout error.

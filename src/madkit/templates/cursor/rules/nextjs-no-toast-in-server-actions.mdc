@@ -1,0 +1,204 @@
+---
+description: 
+globs: *.ts,*.tsx
+alwaysApply: false
+---
+# No Toast Notifications in Server Actions
+
+## Context
+Server actions run on the server side and do not have access to the DOM or browser APIs. Using toast notifications (like `toast.error()`, `toast.success()`, etc.) from libraries such as `sonner` in server actions is architecturally incorrect and can cause runtime errors or silent failures.
+
+Toast notifications require client-side execution to manipulate the DOM and show UI feedback to users. When called from server actions, these operations either fail silently or throw errors because the browser APIs are not available on the server.
+
+The proper pattern is for server actions to return structured response objects with success/error states, and let client-side components handle the UI feedback based on those responses.
+
+## Rule
+1. **Never import** toast libraries (`sonner`, `react-hot-toast`, etc.) in files with `"use server"` directive.
+2. **Never call** `toast.*()` methods in server actions or server-side functions.
+3. **Always return** structured response objects from server actions that include error/success states.
+4. **Let client components** handle toast notifications based on server action responses.
+5. **Preserve error messages** in server action return values for client-side display.
+
+## Examples
+| ❌ Bad (Toast in Server Action) | ✅ Good (Structured Response + Client Toast) |
+|---|---|
+| ```typescript
+"use server";
+import { toast } from "sonner";
+
+export async function uploadFile(file: File) {
+  try {
+    const result = await storage.upload(file);
+    toast.success("File uploaded!");
+    return { success: true };
+  } catch (error) {
+    toast.error(`Upload failed: ${error.message}`);
+    return { success: false };
+  }
+}
+``` | ```typescript
+// Server Action
+"use server";
+
+export async function uploadFile(file: File): Promise<{
+  success: boolean;
+  error?: string;
+}> {
+  try {
+    const result = await storage.upload(file);
+    return { success: true };
+  } catch (error) {
+    return { 
+      success: false, 
+      error: `Upload failed: ${error.message}` 
+    };
+  }
+}
+
+// Client Component
+"use client";
+import { toast } from "sonner";
+
+async function handleUpload(file: File) {
+  const result = await uploadFile(file);
+  if (result.success) {
+    toast.success("File uploaded!");
+  } else {
+    toast.error(result.error || "Upload failed");
+  }
+}
+``` |
+
+## Server Action Response Patterns
+
+### Basic Success/Error Pattern
+```typescript
+type ServerActionResponse<T = void> = 
+  | { success: true; data?: T }
+  | { success: false; error: string };
+
+export async function myServerAction(): Promise<ServerActionResponse<string>> {
+  try {
+    const result = await someOperation();
+    return { success: true, data: result };
+  } catch (error) {
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : "Operation failed" 
+    };
+  }
+}
+```
+
+### Validation Error Pattern
+```typescript
+type ValidationResponse<T = void> = 
+  | { success: true; data?: T }
+  | { success: false; error: string; field?: string };
+
+export async function validateAndSave(data: FormData): Promise<ValidationResponse> {
+  if (!data.get('email')) {
+    return { 
+      success: false, 
+      error: "Email is required", 
+      field: "email" 
+    };
+  }
+  
+  try {
+    await saveData(data);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: "Save failed" };
+  }
+}
+```
+
+## Client-Side Error Handling Patterns
+
+### Form Submission with Toast Feedback
+```typescript
+"use client";
+import { toast } from "sonner";
+import { myServerAction } from "@/app/actions/example";
+
+export function MyForm() {
+  async function handleSubmit(formData: FormData) {
+    const result = await myServerAction(formData);
+    
+    if (result.success) {
+      toast.success("Operation completed successfully!");
+      // Handle success (redirect, reset form, etc.)
+    } else {
+      toast.error(result.error);
+      // Handle error (show field errors, etc.)
+    }
+  }
+
+  return (
+    <form action={handleSubmit}>
+      {/* form fields */}
+    </form>
+  );
+}
+```
+
+### Upload with Progress and Error Handling
+```typescript
+"use client";
+import { toast } from "sonner";
+import { uploadFiles } from "@/app/actions/uploads";
+
+export function FileUploader() {
+  async function handleUpload(files: File[]) {
+    const uploadPromise = uploadFiles(files);
+    
+    toast.promise(uploadPromise, {
+      loading: 'Uploading files...',
+      success: (result) => {
+        if (result.success) {
+          return `Successfully uploaded ${files.length} files!`;
+        }
+        throw new Error(result.error);
+      },
+      error: (error) => `Upload failed: ${error.message}`,
+    });
+    
+    const result = await uploadPromise;
+    if (!result.success) {
+      // Additional error handling if needed
+      console.error('Upload failed:', result.error);
+    }
+  }
+
+  return (
+    <input 
+      type="file" 
+      multiple 
+      onChange={(e) => e.target.files && handleUpload(Array.from(e.target.files))}
+    />
+  );
+}
+```
+
+## Common Server Action Files to Check
+- `app/actions/*.ts` - All server action files
+- `lib/actions/*.ts` - Utility server actions
+- Any file with `"use server"` directive at the top
+
+## Checklist for the Assistant
+- [ ] Never import toast libraries in server action files (`"use server"` directive).
+- [ ] Never call `toast.*()` methods in server-side functions.
+- [ ] Always return structured response objects with success/error states from server actions.
+- [ ] Ensure error messages are preserved in server action responses.
+- [ ] Update client components to handle server action responses with appropriate toast notifications.
+- [ ] Use TypeScript types for server action responses to ensure type safety.
+- [ ] Test all error scenarios to ensure proper client-side toast feedback.
+
+## Red Flags to Watch For
+- [ ] `import { toast } from "sonner"` in files with `"use server"`
+- [ ] `toast.error()`, `toast.success()`, or similar calls in server actions
+- [ ] Server actions that don't return structured error information
+- [ ] Client components calling server actions without proper error handling
+
+This rule ensures proper separation of concerns between server-side business logic and client-side UI feedback, preventing runtime errors and maintaining clean architecture.

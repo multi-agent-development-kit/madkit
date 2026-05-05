@@ -1,0 +1,92 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Use UV and pyproject.toml for Python Dependency Management
+
+## Context
+This project uses `uv` as the Python package manager with dependencies defined in `pyproject.toml`. Using `pip install` commands directly bypasses the configured dependency management setup and can cause environment inconsistencies, version conflicts, and missing dependencies in CI/CD.
+
+The Python applications (like `rag-processor`) use specific dependency group configurations that are only properly managed through `uv` commands and `pyproject.toml` declarations.
+
+## Rule
+1. **Never use** direct `pip install` commands for adding dependencies.
+2. **Always use** `uv` commands or update `pyproject.toml` directly.
+3. **Dependency Groups**: Use appropriate groups for different types of dependencies.
+4. **Environment Sync**: Always sync dependencies after making changes to `pyproject.toml`.
+
+## Command Mappings
+| ❌ Bad (Direct pip commands) | ✅ Good (UV commands) |
+|---|---|
+| `pip install requests` | `uv add "requests>=2.28.0"` |
+| `pip install pytest` | `uv add --group dev "pytest>=7.4.0"` |
+| `pip install -e .` | `uv sync` |
+| `pip install -r requirements.txt` | `uv sync` (uses pyproject.toml) |
+
+## Dependency Group Usage
+- **`[project.dependencies]`** - Core runtime dependencies required for the application
+- **`[dependency-groups.dev]`** - Development tools (linting, formatting, type checking)
+- **`[dependency-groups.test]`** - Testing frameworks and test utilities
+- **`[dependency-groups.lint]`** - Code quality and linting tools
+
+## Available UV Commands
+- **`uv add "package>=1.0.0"`** - Add runtime dependency to `[project.dependencies]`
+- **`uv add --group dev "package>=1.0.0"`** - Add development dependency
+- **`uv add --group test "package>=1.0.0"`** - Add test dependency
+- **`uv sync`** - Install all dependencies from `pyproject.toml`
+- **`uv sync --group dev --group test`** - Install with specific groups
+- **`uv remove "package"`** - Remove a dependency
+- **`uv run command`** - Run command in virtual environment
+
+## Manual pyproject.toml Updates
+When manually editing `pyproject.toml`, always run `uv sync` afterward:
+
+```toml
+[project.dependencies]
+"fastapi>=0.104.0"
+"vertexai>=1.38.0"
+
+[dependency-groups.dev]
+"pytest>=7.4.0"
+"black>=23.0.0"
+"mypy>=1.6.0"
+
+[dependency-groups.test]
+"pytest-asyncio>=0.21.0"
+"pytest-cov>=4.1.0"
+```
+
+Then sync: `uv sync --group dev --group test`
+
+## Testing Commands
+Always use `uv run` for running tests and scripts:
+
+```bash
+# Run tests with proper dependencies
+uv run --group test pytest
+
+# Run with coverage
+uv run --group test pytest --cov=rag_processor
+
+# Run linting
+uv run --group dev black .
+uv run --group dev mypy .
+```
+
+## Why This Matters
+- **Dependency Consistency**: Ensures all environments use same versions
+- **Environment Isolation**: Proper virtual environment management
+- **Group Management**: Separates runtime, dev, and test dependencies
+- **CI/CD Compatibility**: Reproducible builds in deployment pipelines
+- **Lock File Management**: Automatic dependency resolution and locking
+
+## Checklist for the Assistant
+- [ ] Never suggest `pip install` commands in Python projects.
+- [ ] Always use `uv add` for new dependencies or manual `pyproject.toml` edits + `uv sync`.
+- [ ] Choose appropriate dependency groups (`dev`, `test`, etc.).
+- [ ] Run `uv sync` after manual `pyproject.toml` changes.
+- [ ] Use `uv run --group [group] command` for running tests and tools.
+- [ ] Check existing `pyproject.toml` for dependency group patterns before adding new ones.
+
+This ensures consistent Python dependency management and prevents environment-related issues across development, testing, and deployment.

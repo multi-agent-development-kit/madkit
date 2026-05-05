@@ -1,0 +1,69 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Detect Project Type for Linting Commands
+
+## Context
+In multi-app repositories, different directories may contain different types of projects (Python, Node.js, etc.). Using the wrong linting commands can cause confusion and errors.
+
+## Rule
+Before running any linting or validation commands, **always check the project type** based on the files present in the current working directory or the target directory.
+
+### Project Type Detection
+1. **Python Projects** - Look for:
+   - `pyproject.toml` file
+   - `requirements.txt` file
+   - `.py` files
+   - Common directories: `src/`, `tests/`, `rag_processor/`, etc.
+
+2. **Node.js/TypeScript Projects** - Look for:
+   - `package.json` file
+   - `tsconfig.json` file
+   - `.js`, `.ts`, `.tsx` files
+   - Common directories: `app/`, `components/`, `lib/`, etc.
+
+### Correct Commands by Project Type
+
+| Project Type | Linting Commands | Type Checking | Formatting |
+|--------------|------------------|---------------|------------|
+| **Python** | `uv run ruff check` | `uv run mypy` | `uv run black --check` |
+| **Node.js/TypeScript** | `npm run lint` | `npm run type-check` | `npm run format` |
+
+### Examples
+
+#### ❌ Bad (Wrong commands for project type)
+```bash
+# In a Python project (has pyproject.toml)
+npm run lint  # WRONG - this is for Node.js projects
+
+# In a Node.js project (has package.json)
+uv run ruff check  # WRONG - this is for Python projects
+```
+
+#### ✅ Good (Correct commands for project type)
+```bash
+# In a Python project (rag-processor with pyproject.toml)
+uv run ruff check
+uv run mypy
+uv run black --check
+
+# In a Node.js project (web app with package.json)
+npm run lint
+npm run type-check
+```
+
+## Implementation Strategy
+1. **Check current directory** for project indicators
+2. **Look for parent directories** if not found in current dir
+3. **Use the appropriate commands** based on project type detected
+4. **Never assume** - always verify project type before running commands
+
+## Validation Checklist
+- [ ] Check for `pyproject.toml` vs `package.json` in current/target directory
+- [ ] Use Python commands (`uv run`) for Python projects
+- [ ] Use Node.js commands (`npm run`) for JavaScript/TypeScript projects
+- [ ] When in doubt, explicitly check what files exist in the directory
+
+This prevents confusion and ensures the correct tooling is used for each project type.

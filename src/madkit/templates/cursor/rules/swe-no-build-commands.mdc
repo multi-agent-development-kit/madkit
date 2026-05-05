@@ -1,0 +1,48 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Never Run Build Commands - Use Lint Instead
+
+## Context
+Build commands (`npm run build`, `next build`, etc.) are expensive operations that:
+- Take significant time to complete (often 30+ seconds)
+- Consume substantial system resources 
+- Are not necessary for validating code changes during development
+- Can mask underlying issues that should be caught earlier in the development process
+- Are primarily meant for production deployment, not development validation
+
+For code validation during development, lighter-weight commands like `npm run lint` and `npm run type-check` provide faster feedback and catch the same categories of issues that would cause build failures.
+
+## Rule
+1. **Never suggest or run** `npm run build`, `next build`, or similar build commands during development sessions.
+2. **Instead use** appropriate validation commands:
+   - `npm run lint` - Check for linting errors and import issues
+   - `npm run type-check` - Validate TypeScript types without building
+   - `npm test` - Run test suites if available
+3. **Build commands should only be used** for actual deployment or CI/CD pipelines.
+4. **When testing code changes**, prefer incremental validation tools over full builds.
+
+## Examples
+| ❌ Bad (running build) | ✅ Good (using lint/type-check) |
+|---|---|
+| `npm run build --dry-run` | `npm run lint` |
+| `next build` | `npm run type-check` |
+| `npm run build 2>&1 \| head -20` | `npm run lint --fix` |
+
+## Validation Strategy
+For different types of changes:
+- **Import path changes** → `npm run lint`
+- **Type definition changes** → `npm run type-check`
+- **Component logic changes** → `npm run lint` + `npm test`
+- **Configuration changes** → `npm run lint` + manual testing
+
+## Checklist for the Assistant
+- [ ] Never suggest build commands for code validation during development.
+- [ ] Use `npm run lint` to validate import paths and code quality.
+- [ ] Use `npm run type-check` for TypeScript validation.
+- [ ] Only mention build commands in the context of actual deployment.
+- [ ] Prefer faster, incremental validation tools over comprehensive builds.
+
+This ensures efficient development workflow and prevents unnecessary resource consumption during code validation.

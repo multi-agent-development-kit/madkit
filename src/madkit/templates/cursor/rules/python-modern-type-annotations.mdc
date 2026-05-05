@@ -1,0 +1,252 @@
+---
+description: Complete modern Python 3.10+ type annotations with comprehensive examples and validation
+globs: *.py
+alwaysApply: false
+---
+# Python Modern Type Annotations (Python 3.10+)
+
+## Context
+Python 3.10+ introduced modern type annotation syntax that should be used instead of the legacy `typing` module equivalents. This rule ensures comprehensive adoption of modern type annotations and prevents common type annotation errors that can occur when mixing old and new syntax.
+
+This aligns with PEP 604 and modern Python standards, with modern tools like Ruff (UP035, UP006, UP007, UP045) enforcing these standards for better code quality and future compatibility.
+
+**Common Errors This Rule Prevents:**
+- `Use X | None for type annotations` (instead of `Optional[X]`)
+- `Use list instead of List for type annotation` (instead of `List[X]`)
+- `Use dict instead of Dict for type annotation` (instead of `Dict[K, V]`)
+- Missing type annotations causing mypy `[var-annotated]` errors
+- Mixed usage of legacy and modern type annotation syntax
+
+## Rule
+**ALWAYS use modern Python 3.10+ type annotation syntax throughout the entire codebase:**
+
+### Complete Type Replacements
+| ❌ Legacy (typing module) | ✅ Modern (built-in) |
+|---|---|
+| `typing.Dict[str, int]` | `dict[str, int]` |
+| `typing.List[str]` | `list[str]` |
+| `typing.Set[int]` | `set[int]` |
+| `typing.Tuple[str, ...]` | `tuple[str, ...]` |
+| `typing.Optional[str]` | `str \| None` |
+| `typing.Union[str, int]` | `str \| int` |
+| `Optional[List[str]]` | `list[str] \| None` |
+| `List[Dict[str, str]]` | `list[dict[str, str]]` |
+| `Dict[str, List[str]]` | `dict[str, list[str]]` |
+| `Optional[Dict[str, Any]]` | `dict[str, Any] \| None` |
+
+### Required Python Version
+- **Target**: Python 3.10+
+- **Rationale**: Modern syntax, better readability, reduced imports
+
+### Required Import Strategy
+**Minimize typing imports** - only import what's not available as built-ins:
+```python
+# ✅ Modern minimal imports
+from typing import Any, Literal, Protocol, TypeVar, Generic, Callable
+
+# ❌ Legacy imports (DO NOT USE)
+from typing import Dict, List, Optional, Union, Set, Tuple
+```
+
+### Mandatory Pattern for All Python Files
+```python
+# ✅ ALWAYS use this pattern
+from datetime import datetime, timezone
+from typing import Any, Literal  # Only import what's needed beyond built-ins
+from pydantic import BaseModel, Field
+
+class MyModel(BaseModel):
+    # Modern union syntax
+    optional_field: str | None = Field(default=None)
+    
+    # Modern collection syntax
+    items: list[str] = Field(default_factory=list)
+    mapping: dict[str, int] = Field(default_factory=dict)
+    
+    # Complex nested types
+    nested_data: dict[str, list[str]] = Field(default_factory=dict)
+    optional_items: list[str] | None = Field(default=None)
+```
+
+## Comprehensive Examples
+
+### ❌ Bad (Legacy mixed syntax)
+```python
+from typing import Dict, List, Optional, Union, Any
+from datetime import datetime
+
+class BadModel(BaseModel):
+    # Legacy Optional syntax
+    name: Optional[str] = Field(default=None)
+    
+    # Legacy collection syntax  
+    items: List[str] = Field(default_factory=list)
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+    
+    # Mixed legacy/modern syntax
+    tags: Optional[List[str]] = Field(default=None)
+    config: Dict[str, Union[str, int]] = Field(default_factory=dict)
+    
+    # Missing type annotations
+    timestamp = Field(default_factory=datetime.utcnow)
+```
+
+### ✅ Good (Modern consistent syntax)
+```python
+from datetime import datetime, timezone
+from typing import Any, Literal
+from pydantic import BaseModel, Field
+
+class GoodModel(BaseModel):
+    # Modern union syntax
+    name: str | None = Field(default=None)
+    
+    # Modern collection syntax
+    items: list[str] = Field(default_factory=list)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    
+    # Complex modern nested types
+    tags: list[str] | None = Field(default=None)
+    config: dict[str, str | int] = Field(default_factory=dict)
+    
+    # Proper type annotations with modern datetime
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+```
+
+## Function Type Annotations
+```python
+# ✅ Modern function annotations
+def process_data(
+    items: list[str],
+    config: dict[str, Any],
+    optional_filter: str | None = None,
+) -> dict[str, list[str]]:
+    result: dict[str, list[str]] = {}
+    filtered_items: list[str] = []
+    return result
+
+# ✅ Async function annotations
+async def fetch_data(
+    ids: list[str],
+    metadata: dict[str, str] | None = None,
+) -> list[dict[str, Any]]:
+    results: list[dict[str, Any]] = []
+    return results
+```
+
+## Ruff Configuration Requirements
+**Ensure your `pyproject.toml` has these essential rules:**
+```toml
+[tool.ruff.lint]
+select = [
+    "UP006",  # Use dict instead of Dict
+    "UP007",  # Use X | Y instead of Union[X, Y]
+    "UP035",  # Import from typing is deprecated
+    "UP045",  # Use X | None instead of Optional[X]
+    "F401",   # Remove unused imports
+    "F811",   # Redefined unused name
+]
+
+# Auto-fix these rules
+fixable = ["UP006", "UP007", "UP035", "UP045", "F401"]
+```
+
+## Validation Workflow
+**ALWAYS run these commands after making type annotation changes:**
+```bash
+# 1. Auto-fix type annotations
+uv run --group dev ruff check --fix .
+
+# 2. Format code
+uv run --group dev black .
+
+# 3. Check remaining issues
+uv run --group dev ruff check .
+
+# 4. Verify type annotations
+uv run --group dev mypy .
+```
+
+## Common Patterns and Fixes
+
+### Pydantic Models
+```python
+# ✅ Modern Pydantic patterns
+class DataModel(BaseModel):
+    # Simple types
+    name: str
+    active: bool
+    
+    # Optional types
+    description: str | None = Field(default=None)
+    
+    # Collections
+    tags: list[str] = Field(default_factory=list)
+    metadata: dict[str, str] = Field(default_factory=dict)
+    
+    # Complex nested types
+    nested_data: dict[str, list[str]] = Field(default_factory=dict)
+    optional_items: list[dict[str, Any]] | None = Field(default=None)
+    
+    # Literal types
+    status: Literal["active", "inactive"] = Field(default="active")
+```
+
+### Variable Annotations
+```python
+# ✅ Modern variable annotations
+items: list[str] = []
+config: dict[str, Any] = {}
+results: list[dict[str, str]] = []
+optional_data: dict[str, Any] | None = None
+```
+
+### Class Attributes
+```python
+# ✅ Modern class attributes
+class ProcessingService:
+    def __init__(self) -> None:
+        self.items: list[str] = []
+        self.config: dict[str, Any] = {}
+        self.cache: dict[str, str] | None = None
+```
+
+## Migration Strategy
+1. **New Code**: Always use modern syntax from the start
+2. **Auto-fix existing code**: `uv run --group dev ruff check --fix .`
+3. **Remove legacy imports**: Clean up `typing` imports
+4. **Update pyproject.toml**: Add required Ruff rules
+5. **Validate changes**: Run full linting and type checking
+6. **Type Checking**: Ensure mypy is configured for Python 3.10+
+
+## Error Prevention Checklist
+- [ ] **No legacy imports**: Never import `Dict`, `List`, `Optional`, `Union` from typing
+- [ ] **Use modern syntax**: Always use `list[T]`, `dict[K, V]`, `X | None`
+- [ ] **Complete annotations**: All variables, parameters, and return types are annotated
+- [ ] **Consistent patterns**: Same annotation style throughout the codebase
+- [ ] **Ruff configuration**: Essential UP rules enabled in pyproject.toml
+- [ ] **Validation workflow**: Run ruff + mypy after changes
+
+## Benefits of This Approach
+- **Consistency**: Single annotation style across entire codebase
+- **Future-proof**: Aligned with Python 3.10+ standards
+- **Tool support**: Better IDE autocompletion and error detection
+- **Maintainability**: Easier to read and refactor code
+- **Error prevention**: Catches type issues during development
+- **Modern readability**: Cleaner, more intuitive syntax
+
+## Checklist for the Assistant
+- [ ] **Always use modern type annotations** in all Python code
+- [ ] **Never suggest legacy typing imports** (Dict, List, Optional, Union)
+- [ ] **Use `X | None` instead of `Optional[X]`** consistently
+- [ ] **Use `list[T]` instead of `List[T]`** consistently
+- [ ] **Use `dict[K, V]` instead of `Dict[K, V]`** consistently
+- [ ] **Use `set[T]` instead of `Set[T]`** consistently
+- [ ] **Use `tuple[T, ...]` instead of `Tuple[T, ...]`** consistently
+- [ ] **Use `X | Y` instead of `Union[X, Y]`** consistently
+- [ ] **Import only necessary types** from typing module
+- [ ] **Run validation workflow** after making changes
+- [ ] **Update pyproject.toml** with required Ruff rules
+- [ ] **Target Python 3.10+ syntax consistently**
+
+This ensures comprehensive adoption of modern Python type annotations and prevents the specific errors that commonly occur when mixing old and new syntax.

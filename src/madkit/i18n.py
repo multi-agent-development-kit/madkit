@@ -33,9 +33,13 @@ _STRINGS: dict[str, dict[str, str]] = {
         "init_detected_ide": "IDE detectado: {ide}",
         "init_creating_structure": "Creando estructura ai_docs/...",
         "init_copying_claude": "Copiando scaffolding Claude Code...",
+        "init_copying_cursor": "Copiando reglas Cursor + tabla de compatibilidad...",
+        "init_copying_codex": "Generando AGENTS.md para Codex...",
         "init_writing_gitignore": "Actualizando .gitignore...",
         "init_done": "Listo. Próximo paso recomendado:",
         "init_next_step_claude": "  abre tu proyecto en Claude Code y ejecuta `/setup_project` para análisis de docs.",
+        "init_next_step_cursor": "  abre tu proyecto en Cursor; las reglas activas están en `.cursor/rules/`.",
+        "init_next_step_codex": "  Codex / GitHub Copilot leerán `AGENTS.md` automáticamente como contexto.",
         # iniciar — errores
         "init_err_path_not_dir": "La ruta '{path}' no es un directorio existente.",
         "init_err_already_initialized": (
@@ -80,9 +84,13 @@ _STRINGS: dict[str, dict[str, str]] = {
         "init_detected_ide": "Detected IDE: {ide}",
         "init_creating_structure": "Creating ai_docs/ structure...",
         "init_copying_claude": "Copying Claude Code scaffolding...",
+        "init_copying_cursor": "Copying Cursor rules + compatibility table...",
+        "init_copying_codex": "Generating AGENTS.md for Codex...",
         "init_writing_gitignore": "Updating .gitignore...",
         "init_done": "Done. Recommended next step:",
         "init_next_step_claude": "  open your project in Claude Code and run `/setup_project` for doc analysis.",
+        "init_next_step_cursor": "  open your project in Cursor; active rules live in `.cursor/rules/`.",
+        "init_next_step_codex": "  Codex / GitHub Copilot will read `AGENTS.md` automatically as context.",
         # iniciar — errors
         "init_err_path_not_dir": "Path '{path}' is not an existing directory.",
         "init_err_already_initialized": (

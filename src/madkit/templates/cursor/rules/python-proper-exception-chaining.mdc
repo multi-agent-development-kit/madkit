@@ -1,0 +1,132 @@
+---
+description: 
+globs: *.py
+alwaysApply: false
+---
+# Python Proper Exception Chaining
+
+## Context
+When catching an exception and raising a new one, Python best practice is to use `raise ... from e` instead of bare raise
+
+This is enforced by Ruff rule B904 and is crucial for maintaining clear error traces in production applications.
+
+## Rule
+**ALWAYS use proper exception chaining when re-raising exceptions:**
+
+### Exception Chaining Options
+1. **`raise ... from e`** - Chain the original exception (preserves stack trace)
+2. **`raise ... from None`** - Suppress the original exception (when not relevant)
+3. **`raise`** - Re-raise the same exception (no custom message)
+
+## Examples
+
+### ❌ Bad (No exception chaining)
+```python
+def process_file(file_path: str) -> None:
+    try:
+        with open(file_path, 'r') as f:
+            data = f.read()
+    except IOError as e:
+        logger.error(f"Failed to read file: {e}")
+        # BAD: Loses original exception context
+        raise ProcessingError(f"File processing failed: {e}")
+```
+
+### ✅ Good (Proper exception chaining)
+```python
+def process_file(file_path: str) -> None:
+    try:
+        with open(file_path, 'r') as f:
+            data = f.read()
+    except IOError as e:
+        logger.error(f"Failed to read file: {e}")
+        # GOOD: Preserves original exception context
+        raise ProcessingError(f"File processing failed: {e}") from e
+```
+
+### ✅ Also Good (Suppress original when not relevant)
+```python
+def validate_input(data: str) -> None:
+    try:
+        parsed = json.loads(data)
+    except json.JSONDecodeError as e:
+        # GOOD: Suppress original when providing cleaner user-facing error
+        raise ValidationError("Invalid JSON format provided") from None
+```
+
+## When to Use Each Pattern
+
+### Use `raise ... from e` when:
+- **Original exception is relevant** for debugging
+- **Stack trace is helpful** for developers
+- **Multiple layers of processing** where context matters
+- **Production debugging** requires full error context
+
+### Use `raise ... from None` when:
+- **Original exception is implementation detail** users shouldn't see
+- **Creating user-friendly error messages** 
+- **Converting internal errors** to public API errors
+- **Security concerns** about exposing internal details
+
+### Use bare `raise` when:
+- **Re-raising the same exception** without modification
+- **Cleanup code** that doesn't change the error
+- **Finally blocks** or similar
+
+## Common Patterns
+
+### Service Layer Exception Handling
+```python
+class ProcessingService:
+    async def process_data(self, data: dict) -> ProcessingResult:
+        try:
+            result = await self._internal_process(data)
+            return result
+        except DatabaseError as e:
+            logger.error("Database operation failed", error=str(e))
+            # Chain for debugging context
+            raise ProcessingServiceError("Data processing failed") from e
+        except ValidationError as e:
+            # Suppress for user-friendly errors
+            raise ProcessingServiceError("Invalid data format") from None
+```
+
+### API Error Handling
+```python
+@app.post("/process")
+async def process_endpoint(data: ProcessingRequest) -> ProcessingResponse:
+    try:
+        result = await processing_service.process_data(data.dict())
+        return ProcessingResponse(result=result)
+    except ProcessingServiceError as e:
+        # Log with context, return clean error to user
+        logger.error("Processing request failed", error=str(e))
+        raise HTTPException(status_code=500, detail="Processing failed") from None
+```
+
+## Ruff Configuration
+Ensure your `pyproject.toml` has this rule enabled:
+```toml
+[tool.ruff.lint]
+select = [
+    "B904",  # Within `except` clause, raise exceptions with `raise ... from err`
+]
+```
+
+## Validation Commands
+```bash
+# Check for proper exception chaining
+uv run --group lint ruff check --select B904 .
+
+# Auto-fix is not available for this rule - manual fix required
+```
+
+## Checklist for the Assistant
+- [ ] Use `raise ... from e` when original exception context is valuable
+- [ ] Use `raise ... from None` when suppressing internal implementation details
+- [ ] Use bare `raise` only when re-raising the same exception unchanged
+- [ ] Always consider whether the original exception helps or hinders debugging
+- [ ] Log original exception details before raising chained exceptions
+- [ ] Never use bare `raise NewException()` in except blocks
+
+This ensures proper error handling, better debugging experience, and follows modern Python exception handling best practices.

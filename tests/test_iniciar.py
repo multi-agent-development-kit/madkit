@@ -97,3 +97,62 @@ def test_iniciar_does_not_duplicate_gitignore_entry(tmp_path: Path) -> None:
     assert result.exit_code == 0
     gitignore = (tmp_path / ".gitignore").read_text(encoding="utf-8")
     assert gitignore.count("ai_docs/") == 1
+
+
+# ---------- --ide=cursor ----------------------------------------------------
+
+
+def test_iniciar_cursor_creates_rules_dir(tmp_path: Path) -> None:
+    result = runner.invoke(app, ["iniciar", str(tmp_path), "--ide", "cursor"])
+    assert result.exit_code == 0, result.output
+    assert (tmp_path / ".cursor" / "rules").is_dir()
+    # Esperamos que se hayan copiado las reglas embebidas (≥ 1 .mdc)
+    rules = list((tmp_path / ".cursor" / "rules").glob("*.mdc"))
+    assert len(rules) >= 1
+
+
+def test_iniciar_cursor_creates_compatibility_doc(tmp_path: Path) -> None:
+    result = runner.invoke(app, ["iniciar", str(tmp_path), "--ide", "cursor"])
+    assert result.exit_code == 0
+    compat = tmp_path / ".cursor" / "MADKIT_COMPATIBILITY.md"
+    assert compat.exists()
+    content = compat.read_text(encoding="utf-8")
+    assert "Claude Code" in content
+
+
+def test_iniciar_cursor_does_not_create_claude_md(tmp_path: Path) -> None:
+    """--ide=cursor NO debe crear CLAUDE.md (es scaffolding Claude)."""
+    result = runner.invoke(app, ["iniciar", str(tmp_path), "--ide", "cursor"])
+    assert result.exit_code == 0
+    assert not (tmp_path / "CLAUDE.md").exists()
+
+
+def test_iniciar_cursor_aborts_when_already_initialized(tmp_path: Path) -> None:
+    (tmp_path / ".cursor" / "rules").mkdir(parents=True)
+    result = runner.invoke(app, ["iniciar", str(tmp_path), "--ide", "cursor"])
+    assert result.exit_code == 1
+
+
+# ---------- --ide=all coexistencia -----------------------------------------
+
+
+def test_iniciar_all_deploys_claude_and_cursor(tmp_path: Path) -> None:
+    """Con --ide=all, claude despliega CLAUDE.md y cursor despliega .cursor/rules/.
+
+    Los subdirectorios `.claude/{commands,agents,skills,hooks}` se poblarán cuando
+    la sub-fase D del task 083 sincronice los templates desde el repo de gestión.
+    """
+    result = runner.invoke(app, ["iniciar", str(tmp_path), "--ide", "all"])
+    assert result.exit_code == 0, result.output
+    assert (tmp_path / "CLAUDE.md").exists()
+    assert (tmp_path / ".cursor" / "rules").is_dir()
+    assert (tmp_path / ".cursor" / "MADKIT_COMPATIBILITY.md").exists()
+    rules = list((tmp_path / ".cursor" / "rules").glob("*.mdc"))
+    assert len(rules) >= 1
+
+
+def test_iniciar_all_aborts_when_either_already_initialized(tmp_path: Path) -> None:
+    """Si --ide=all y .claude/ ya existe, abort sin --force (primer adapter en orden)."""
+    (tmp_path / ".claude" / "agents").mkdir(parents=True)
+    result = runner.invoke(app, ["iniciar", str(tmp_path), "--ide", "all"])
+    assert result.exit_code == 1

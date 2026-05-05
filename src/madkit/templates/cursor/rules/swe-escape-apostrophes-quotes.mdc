@@ -1,0 +1,47 @@
+---
+description: 
+globs: *.tsx
+alwaysApply: false
+---
+# Escape Apostrophes and Quotes in JSX/HTML
+
+## Context
+Our linter flags un-escaped apostrophes (`'`) and quotation marks (`"`) that appear **inside JSX/HTML text nodes**.  For example, writing:
+
+```tsx
+<h2>AI Power Users' Biggest Frustration—<span>Solved</span></h2>
+```
+triggers the warning:
+
+```
+' can be escaped with &apos;, &lsquo;, &#39;, &rsquo;.
+```
+
+## Rule
+When generating JSX/HTML (including Markdown that _will_ be rendered as HTML), **never place raw apostrophes or quotation marks directly inside a text node**.  Instead, do **one** of the following:
+
+1. **Use the corresponding HTML entity**
+   • Apostrophe → `&rsquo;`, `&apos;`, or `&#39;`  
+   • Double quote → `&quot;`, `&ldquo;`, or `&#34;`
+
+2. **Embed the string inside a JavaScript expression** and rely on normal string escaping:
+
+```tsx
+<h2>{"AI Power Users' Biggest Frustration—"}<span>Solved</span></h2>
+```
+
+3. **Rewrite the sentence** to avoid the problematic character if it does not change the meaning.
+
+## Examples
+| ❌ Bad | ✅ Good |
+|-------|--------|
+| `<p>Sarah's workflow</p>` | `<p>Sarah&rsquo;s workflow</p>` |
+| `<blockquote>"Time-saving" tools.</blockquote>` | `<blockquote>&ldquo;Time-saving&rdquo; tools.</blockquote>` |
+| `<h2>AI Power Users' Biggest Frustration—</h2>` | `{"AI Power Users' Biggest Frustration—"}` |
+
+## Checklist for the Assistant
+- [ ] Scan all JSX/HTML text nodes for `'` and `"` characters.
+- [ ] Apply one of the approved escaping strategies above.
+- [ ] Ensure linter passes without string-literal escape warnings.
+
+Follow this rule consistently in all future code generations. 

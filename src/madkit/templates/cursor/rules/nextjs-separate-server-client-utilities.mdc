@@ -1,0 +1,129 @@
+---
+description: 
+globs: *.tsx,*.ts
+alwaysApply: false
+---
+# Separate Server-Side and Client-Safe Utilities
+
+## Context
+In Next.js applications, utility files that mix server-side imports (like `next/headers`, `@/lib/supabase/server`) with client-safe constants or functions can cause build errors when client components try to import the client-safe parts.
+
+The error occurs because Next.js attempts to bundle server-only modules (like `cookies` from `next/headers`) into the client bundle when any part of the file is imported by a client component, leading to:
+
+```
+Error: You're importing a component that needs "next/headers". That only works in a Server Component which is not supported in the pages/ directory.
+```
+
+This happens even when client components only need constants or pure utility functions from the file.
+
+## Rule
+1. **Never mix** server-side imports with client-safe utilities in the same file.
+2. **Separate concerns** by creating dedicated files:
+   • `*-constants.ts` - Client-safe constants, types, and pure utility functions
+   • `*.ts` - Server-side functions that can re-export from constants file for backward compatibility
+3. **Server-side imports include**:
+   • `next/headers` (cookies, headers)
+   • `@/lib/supabase/server` or similar server-only clients
+   • `@/lib/auth` or other server-only authentication utilities
+   • Any module that uses Node.js APIs or server-only functionality
+4. **Client-safe utilities include**:
+   • Constants and configuration objects
+   • Pure functions (no server-side dependencies)
+   • Type definitions and interfaces
+   • Validation schemas and helpers
+
+## Examples
+| ❌ Bad (mixed concerns) | ✅ Good (separated concerns) |
+|---|---|
+| ```typescript
+// lib/storage.ts
+import { createClient } from "@/lib/supabase/server";
+
+export const IMAGE_CONSTRAINTS = {
+  MAX_SIZE: 10 * 1024 * 1024,
+  ALLOWED_TYPES: ["image/jpeg", "image/png"]
+};
+
+export function generatePath(id: string) {
+  return `images/${id}`;
+}
+
+export async function getPublicUrl(path: string) {
+  const supabase = await createClient();
+  return supabase.storage.from("bucket").getPublicUrl(path);
+}
+``` | ```typescript
+// lib/storage-constants.ts (client-safe)
+export const IMAGE_CONSTRAINTS = {
+  MAX_SIZE: 10 * 1024 * 1024,
+  ALLOWED_TYPES: ["image/jpeg", "image/png"]
+};
+
+export function generatePath(id: string) {
+  return `images/${id}`;
+}
+
+// lib/storage.ts (server-only)
+import { createClient } from "@/lib/supabase/server";
+
+export async function getPublicUrl(path: string) {
+  const supabase = await createClient();
+  return supabase.storage.from("bucket").getPublicUrl(path);
+}
+
+// Re-export for backward compatibility
+export { IMAGE_CONSTRAINTS, generatePath } from "./storage-constants";
+``` |
+
+## File Naming Conventions
+- **`lib/[name]-constants.ts`** - Client-safe constants and utilities
+- **`lib/[name].ts`** - Server-side functions with optional re-exports
+- **`lib/[name]-client.ts`** - Client-side specific utilities (if needed)
+- **`lib/[name]-server.ts`** - Explicitly server-only functions
+
+## Import Guidelines
+```typescript
+// ✅ Client components import from constants
+import { IMAGE_CONSTRAINTS } from "@/lib/storage-constants";
+
+// ✅ Server components can import from either
+import { getPublicUrl } from "@/lib/storage";
+import { IMAGE_CONSTRAINTS } from "@/lib/storage"; // Re-exported
+
+// ✅ Server actions import server functions
+import { getPublicUrl } from "@/lib/storage";
+```
+
+## Common Patterns That Need Separation
+
+| Pattern | Server-Side File | Client-Safe File |
+|---|---|---|
+| **Storage utilities** | Upload/download functions | Constants, path generators |
+| **Database operations** | CRUD operations | Validation schemas, types |
+| **Authentication** | Session management | User type definitions |
+| **API integrations** | Server-side API calls | Request/response types |
+| **Email services** | Send email functions | Template constants |
+
+## Migration Strategy
+When encountering mixed files:
+
+1. **Create constants file** with client-safe exports
+2. **Update original file** to import server-only modules and re-export constants
+3. **Update client components** to import from constants file
+4. **Keep server imports** unchanged (they can use either file)
+
+## Validation Checklist
+- [ ] Files with server-side imports should not export client-needed constants directly
+- [ ] Constants and pure utilities should be in separate `-constants.ts` files
+- [ ] Client components should only import from client-safe files
+- [ ] Server-side files can re-export from constants files for convenience
+- [ ] All imports resolve correctly after separation
+
+## Checklist for the Assistant
+- [ ] When creating utility files, separate server-side functions from client-safe constants
+- [ ] Suggest `-constants.ts` files for client-safe utilities
+- [ ] Never mix `next/headers`, `@/lib/supabase/server`, or other server-only imports with client-needed utilities
+- [ ] Recommend re-exports in server files for backward compatibility
+- [ ] Update import statements in client components to use constants files
+
+This prevents server/client boundary violations and ensures clean separation of concerns in Next.js applications.

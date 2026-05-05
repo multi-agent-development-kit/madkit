@@ -1,0 +1,218 @@
+---
+description: 
+globs: *.py
+alwaysApply: false
+---
+# Python Automatic Linting Checks - IMMEDIATE Verification Required
+
+## Context
+Python projects in this repository use strict linting standards enforced by Ruff, Black, and Mypy. Manual linting fixes after writing code lead to massive rewrites and development inefficiency. 
+
+**Critical Issue**: We recently encountered multiple instances where Python files were created with linting errors that could have been caught immediately, requiring manual intervention and rework.
+
+**Real Example**: `deployment_config.py` was created with:
+- `W293: Blank line contains whitespace`
+- `UP035: typing.Dict is deprecated, use dict instead` 
+- `UP006: Use dict instead of Dict for type annotation`
+
+These are 100% preventable with immediate verification after file creation.
+
+## MANDATORY Rule for AI Assistant
+1. **IMMEDIATELY run linting checks** after creating or editing ANY Python file
+2. **NEVER complete a task** involving Python code without passing all linting tools
+3. **PROACTIVELY verify** - don't wait for user to request linting checks
+4. **Use automated fixes** where possible to maintain consistency
+5. **Follow modern Python standards** (3.10+ syntax, proper exception handling, type annotations)
+
+## IMMEDIATE Verification Workflow
+**After creating or editing ANY Python file, ALWAYS run:**
+
+```bash
+# 1. Check for immediate syntax/linting issues
+uv run --group lint ruff check filename.py
+
+# 2. Auto-fix what can be fixed automatically  
+uv run --group lint ruff check --fix filename.py
+
+# 3. Format the file consistently
+uv run --group lint black filename.py
+
+# 4. Verify type annotations
+uv run --group lint mypy filename.py
+```
+
+**CRITICAL**: Do not consider the task complete until ALL checks pass.
+
+## Required Linting Commands
+**Run these commands in order for ALL Python files:**
+
+```bash
+# 1. Auto-fix issues where possible
+uv run --group lint ruff check --fix .
+
+# 2. Format code consistently  
+uv run --group lint black .
+
+# 3. Check remaining issues that need manual fixes
+uv run --group lint ruff check .
+
+# 4. Verify type annotations
+uv run --group lint mypy .
+```
+
+## Common Issues Prevention
+| Issue Category | Ruff Codes | Prevention |
+|---|---|---|
+| **Unused Imports** | F401 | Remove unused `import json`, `import time`, etc. |
+| **Legacy Type Annotations** | UP035, UP006, UP045 | Use `dict[str, str]` not `Dict[str, str]` |
+| **Bare Except Clauses** | E722 | Use `except Exception:` not `except:` |
+| **Poor Exception Chaining** | B904 | Use `raise Exception(...) from e` |
+| **Unnecessary F-strings** | F541 | Remove `f""` when no placeholders exist |
+| **File Opening Issues** | UP015 | Remove unnecessary `"r"` mode |
+
+## Automated vs Manual Fixes
+### ✅ Auto-fixable with `ruff check --fix`
+- Unused imports removal
+- Modern type annotation conversion  
+- Unnecessary f-string removal
+- File opening mode cleanup
+
+### ❌ Requires Manual Fix
+- Bare except clause handling
+- Exception chaining implementation
+- Missing type annotations
+- Complex logical issues
+
+## Command Integration
+**For Individual Files:**
+```bash
+# Quick check single file
+uv run --group lint ruff check path/to/file.py
+
+# Auto-fix single file
+uv run --group lint ruff check --fix path/to/file.py
+```
+
+**For Project-wide:**
+```bash
+# Complete project validation
+uv run --group lint ruff check --fix .
+uv run --group lint black .
+uv run --group lint mypy .
+```
+
+## Examples
+
+### ❌ Bad (Multiple linting violations)
+```python
+import json  # F401 - unused import
+import time  # F401 - unused import  
+from typing import Dict, Optional  # UP035 - legacy typing
+
+def process_data(data: Dict[str, str], options: Optional[str] = None) -> str:  # UP006, UP045
+    try:
+        with open("file.txt", "r") as f:  # UP015 - unnecessary mode
+            content = f.read()
+            result = f"processed"  # F541 - unnecessary f-string
+    except:  # E722 - bare except
+        raise Exception("Failed")  # B904 - missing exception chaining
+    return result
+```
+
+### ✅ Good (Lint-compliant)
+```python
+from pathlib import Path
+
+def process_data(data: dict[str, str], options: str | None = None) -> str:
+    try:
+        with open("file.txt") as f:
+            content = f.read()
+            result = "processed"
+    except Exception as e:
+        raise Exception("Failed to process data") from e
+    return result
+```
+
+## Ruff Configuration Required
+Ensure `pyproject.toml` includes these essential rules:
+```toml
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings  
+    "F",      # pyflakes
+    "UP",     # pyupgrade
+    "B",      # flake8-bugbear
+    "C4",     # flake8-comprehensions
+]
+
+[tool.ruff.lint.extend-per-file-ignores]
+# Allow specific ignores only where absolutely necessary
+```
+
+## Development Workflow
+1. **Write Python code** following existing rules
+2. **Run auto-fixes**: `uv run --group lint ruff check --fix .`
+3. **Format code**: `uv run --group lint black .`
+4. **Check remaining issues**: `uv run --group lint ruff check .`
+5. **Fix manual issues** (bare except, exception chaining, etc.)
+6. **Verify types**: `uv run --group lint mypy .`
+7. **Only then** consider code ready for review
+
+## IDE Integration
+**Recommended VS Code/Cursor extensions:**
+- Ruff (official) - real-time linting
+- Black Formatter - auto-formatting on save
+- Mypy Type Checker - type checking
+
+**Settings for immediate feedback:**
+```json
+{
+    "python.linting.enabled": true,
+    "python.linting.ruffEnabled": true,
+    "python.formatting.provider": "black",
+    "editor.formatOnSave": true
+}
+```
+
+## Emergency Bypass (NEVER USE IN NORMAL DEVELOPMENT)
+```bash
+# Only for debugging broken environments
+uv run --group lint ruff check --fix --unsafe-fixes .
+```
+
+## MANDATORY Checklist for AI Assistant
+**IMMEDIATELY after creating or editing ANY Python file:**
+
+- [ ] **IMMEDIATELY run** `uv run --group lint ruff check filename.py` (specific file)
+- [ ] **AUTO-FIX issues** with `uv run --group lint ruff check --fix filename.py`  
+- [ ] **FORMAT code** with `uv run --group lint black filename.py`
+- [ ] **VERIFY types** with `uv run --group lint mypy filename.py`
+- [ ] **ENSURE ALL CHECKS PASS** before considering task complete
+- [ ] **NEVER skip verification** - this is mandatory for every Python file
+- [ ] **PROACTIVELY check** - don't wait for user to request linting
+
+**Content Standards:**
+- [ ] Verify all modern type annotations (no `typing.Dict`, `typing.Optional`)
+- [ ] Ensure proper exception handling with `from e` chaining
+- [ ] Remove unused imports automatically
+- [ ] Never submit code with bare `except:` clauses
+- [ ] Check that all functions have proper type annotations
+
+## Why Immediate Verification Matters
+- **Prevents embarrassing rework** - catches issues in seconds, not after user feedback
+- **Saves development time** - fixing issues immediately vs. debugging later
+- **Maintains user trust** - demonstrates thorough, professional development practices
+- **Ensures consistent quality** - every Python file meets standards from creation
+- **Reduces frustration** - users don't have to point out basic linting errors
+- **Enables reliable deployments** - CI/CD pipelines never fail on linting
+
+## AI Assistant Responsibilities
+**The AI Assistant MUST:**
+1. **Proactively run** linting checks on every Python file created/edited
+2. **Never deliver** Python code with linting errors  
+3. **Immediately fix** auto-fixable issues without user intervention
+4. **Report verification status** to user ("✅ All linting checks passed")
+5. **Document any manual fixes** made during verification process
+
+**Remember**: Taking 30 seconds to verify now prevents 30 minutes of rework later.

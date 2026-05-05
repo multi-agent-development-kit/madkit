@@ -1,0 +1,340 @@
+---
+description: Never use type ignore comments in Python - fix type issues properly
+globs: *.py
+alwaysApply: false
+---
+
+# Never Use Type Ignore Comments in Python
+
+## Rule
+
+FORBIDDEN type suppression patterns:
+- `# type: ignore`
+- `# type: ignore[attr-defined]`
+- `# type: ignore[import-untyped]`
+- Any variant of type ignore comments
+
+ALWAYS fix the underlying type issue instead of suppressing type checker warnings.
+
+## Context
+
+Type ignore comments mask real type safety issues that should be addressed. They hide type problems, reduce maintainability, mask breaking changes during refactoring, and bypass the benefits of static type checking.
+
+Proper type handling through explicit annotations, correct imports, type stubs, and proper type definitions is always preferred.
+
+## Common Issues and Solutions
+
+### Import Issues
+
+Incorrect:
+```python
+from google.cloud import storage  # type: ignore[import-untyped]
+import requests  # type: ignore[import-untyped]
+from complex_lib import ComplexType  # type: ignore
+```
+
+Correct:
+```python
+# Install type stubs
+# pip install types-google-cloud-storage types-requests
+
+from google.cloud.storage import Client as StorageClient
+import requests
+
+# For type-only imports
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from complex_lib import ComplexType
+
+def process_data(data: "ComplexType") -> None:
+    pass
+```
+
+### Attribute Access Issues
+
+Incorrect:
+```python
+from google.cloud import storage  # type: ignore[attr-defined]
+client = storage.Client()
+
+obj.dynamic_attr  # type: ignore[attr-defined]
+config.unknown_key  # type: ignore[attr-defined]
+```
+
+Correct:
+```python
+# Use specific imports
+from google.cloud.storage import Client as StorageClient
+client = StorageClient()
+
+# Use safe attribute access
+dynamic_value = getattr(obj, 'dynamic_attr', default_value)
+config_value = config.get('unknown_key')
+
+# Or use TypedDict
+from typing import TypedDict
+
+class Config(TypedDict):
+    database_url: str
+    api_key: str
+
+config: Config = load_config()
+database_url = config['database_url']
+```
+
+### Missing Type Annotations
+
+Incorrect:
+```python
+def process(data):  # type: ignore
+    return data.someProperty
+
+result = api_call()  # type: ignore
+```
+
+Correct:
+```python
+def process(data: dict[str, Any]) -> str:
+    return data['someProperty']
+
+result: ApiResponse = api_call()
+# Or use explicit casting
+from typing import cast
+result = cast(ApiResponse, api_call())
+```
+
+### Third-Party Library Issues
+
+Incorrect:
+```python
+client.method()  # type: ignore[attr-defined]
+from untyped_lib import func  # type: ignore[import-untyped]
+```
+
+Correct:
+```python
+# Install type stubs
+# pip install types-untyped-lib
+
+# Or use protocols
+from typing import Protocol
+
+class ClientProtocol(Protocol):
+    def method(self) -> str: ...
+
+client: ClientProtocol = get_client()
+client.method()
+```
+
+## Database Extensions Without Type Stubs
+
+For libraries like `pgvector` that lack type stubs, use conditional imports:
+
+Incorrect:
+```python
+from pgvector.psycopg2 import register_vector  # type: ignore[import-untyped]
+
+def setup_database(conn):
+    register_vector(conn)
+```
+
+Correct:
+```python
+from typing import TYPE_CHECKING, Any, Callable
+
+# Runtime import
+try:
+    from pgvector.psycopg2 import register_vector
+except ImportError:
+    register_vector = None
+
+if TYPE_CHECKING:
+    # Type-only definition
+    register_vector: Callable[[Any], None]
+
+def setup_database(conn: Any) -> None:
+    """Setup database with vector support.
+
+    Note: pgvector.psycopg2 lacks type stubs, using conditional import
+    to maintain type safety while preserving runtime functionality.
+    """
+    if register_vector is not None:
+        register_vector(conn)
+```
+
+Alternative protocol approach:
+```python
+from typing import Protocol, Any
+
+class VectorRegistrar(Protocol):
+    def __call__(self, conn: Any) -> None: ...
+
+def get_register_vector_func() -> VectorRegistrar | None:
+    """Dynamically import pgvector register_vector function."""
+    try:
+        from pgvector.psycopg2 import register_vector
+        return register_vector
+    except ImportError:
+        return None
+
+def setup_database(conn: Any) -> None:
+    register_func = get_register_vector_func()
+    if register_func:
+        register_func(conn)
+```
+
+## Installing Type Stubs
+
+### Common type stubs
+```bash
+# Google Cloud
+pip install types-google-cloud-storage
+pip install types-google-cloud-pubsub
+pip install google-cloud-aiplatform[types]
+
+# HTTP and databases
+pip install types-requests
+pip install types-redis
+pip install types-psycopg2-binary
+pip install types-PyMySQL
+```
+
+### Add to pyproject.toml
+```toml
+[dependency-groups.dev]
+types-google-cloud-storage = ">=1.0.0"
+types-requests = ">=2.28.0"
+google-cloud-aiplatform = {extras = ["types"], version = ">=1.38.0"}
+```
+
+## Proper Type Solutions
+
+### Use TYPE_CHECKING conditional imports
+```python
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from google.cloud.storage import Bucket
+    from vertexai.generative_models import GenerativeModel
+
+def process_bucket(bucket: "Bucket") -> None:
+    pass
+```
+
+### Use type casting
+```python
+from typing import cast
+
+# When you know the type but checker doesn't
+result = cast(SpecificType, some_dynamic_value)
+```
+
+### Define custom types
+```python
+from typing import TypedDict, Protocol
+
+class ConfigDict(TypedDict):
+    host: str
+    port: int
+    ssl: bool
+
+class StorageProtocol(Protocol):
+    def upload(self, file: bytes) -> str: ...
+    def download(self, path: str) -> bytes: ...
+```
+
+### Use specific import paths
+```python
+# Instead of broad imports
+from google.cloud.storage import Client as StorageClient
+from google.cloud.storage.bucket import Bucket
+from google.cloud.storage.blob import Blob
+```
+
+### Safe attribute access
+```python
+# Use getattr with defaults
+optional_value = getattr(obj, 'optional_attr', None)
+
+# Use hasattr checks
+if hasattr(obj, 'optional_attr'):
+    value = obj.optional_attr
+
+# Use dict.get() for dictionaries
+config_value = config.get('key', default)
+```
+
+## Library-Specific Solutions
+
+### Google Cloud Storage
+```python
+# Install: pip install types-google-cloud-storage
+from google.cloud.storage import Client, Bucket, Blob
+
+client = Client()
+bucket: Bucket = client.bucket("my-bucket")
+blob: Blob = bucket.blob("my-file")
+```
+
+### SQLAlchemy
+```python
+# Use specific imports
+from sqlalchemy.engine import create_engine
+```
+
+### Requests
+```python
+# Install: pip install types-requests
+import requests
+
+response: requests.Response = requests.get("https://api.example.com")
+```
+
+## Exceptions (Very Rare)
+
+Type suppression is acceptable only in extremely rare cases:
+1. Third-party library bug with incorrect type stubs that can't be fixed
+2. Temporary workaround during migration (with documented plan to fix)
+3. Platform-specific code with different types on different platforms
+
+Even in these cases:
+- Document WHY the suppression is needed
+- Create a tracking issue to fix it properly
+- Use the most specific suppression possible
+- Set a deadline for proper fix
+
+## Verification Before Adding Imports
+
+1. Check PyPI for official type stubs: `types-{package-name}`
+2. Check package extras: some include types with `[types]` extra
+3. Read documentation for typing guidance
+4. Create protocols for complex third-party integrations
+
+## Detection and Migration
+
+Find all type ignore comments:
+```bash
+rg "# type: ignore"
+```
+
+Run type checking:
+```bash
+mypy --show-error-codes your_file.py
+pyright your_file.py
+```
+
+## Checklist for the Assistant
+
+- [ ] Never suggest `# type: ignore` comments in any form
+- [ ] Always investigate and fix the root cause of type checker warnings
+- [ ] Check for available type stubs before imports
+- [ ] Install appropriate type stubs for third-party libraries
+- [ ] Use conditional imports with `TYPE_CHECKING` when appropriate
+- [ ] Use `typing.cast()` for legitimate type narrowing needs
+- [ ] Create custom types and protocols for complex structures
+- [ ] Use specific import paths to get better type information
+- [ ] Use safe attribute access patterns (getattr, hasattr, dict.get)
+- [ ] Document any custom type solutions clearly
+
+## Remember
+
+Type ignore comments hide real problems. Proper typing provides better IDE support, catches bugs early, and makes refactoring safer. Always fix the root cause instead of suppressing warnings.

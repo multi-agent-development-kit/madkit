@@ -1,0 +1,28 @@
+---
+description: 
+globs: apps/web/lib/drizzle/schema/**/*.ts
+alwaysApply: false
+---
+# Enforce Correct `pgTable` Syntax for Constraints
+
+## Context
+The Drizzle ORM `pgTable` function has deprecated the syntax for defining table-level constraints (like indexes or composite unique keys) where the configuration function returns an object. This old syntax triggers a deprecation warning and will likely be removed in a future version of Drizzle.
+
+The correct, modern syntax requires the configuration function to return an **array** of constraints.
+
+## Rule
+1.  When defining table-level constraints for a `pgTable`, the configuration function (the third argument) **must** return an array.
+2.  Each constraint, such as `unique()`, `index()`, or `foreignKey()`, must be an element within that returned array.
+3.  **Never** use the deprecated syntax where the configuration function returns an object.
+
+## Examples
+| ❌ Bad (Returns an Object) | ✅ Good (Returns an Array) |
+|---|---|
+| ```ts export const users = pgTable("users", {   id: integer("id"),   name: text("name"), }, (t) => ({   name_idx: index('name_idx').on(t.name), })); ``` | ```ts export const users = pgTable("users", {   id: integer("id"),   name: text("name"), }, (t) => [   index('name_idx').on(t.name), ]); ``` |
+| ```ts export const posts = pgTable("posts", {   id: integer("id"),   author_id: integer("author_id"),   city_id: integer("city_id"), }, (t) => ({   author_city_unq: unique().on(t.author_id, t.city_id), })); ``` | ```ts export const posts = pgTable("posts", {   id: integer("id"),   author_id: integer("author_id"),   city_id: integer("city_id"), }, (t) => [   unique().on(t.author_id, t.city_id), ]); ``` |
+
+
+## Checklist for the Assistant
+- [ ] When defining `pgTable` constraints, ensure the configuration function returns an array `[...]`.
+- [ ] Do not use an object literal `{...}` to return constraints.
+- [ ] Verify the table definition passes linting and type-checking without deprecation warnings related to this syntax.

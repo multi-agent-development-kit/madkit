@@ -1,0 +1,269 @@
+---
+description: Never use any type or @ts-expect-error - use proper TypeScript types
+globs: *.ts,*.tsx
+alwaysApply: false
+---
+
+# Never Bypass TypeScript Type Safety
+
+## Rule
+
+FORBIDDEN type safety bypasses:
+- Explicit `any` type annotations
+- `@ts-expect-error` directives
+- `@ts-ignore` directives
+- `// @ts-nocheck` directives
+
+ALWAYS use proper TypeScript types instead.
+
+## Context
+
+The `any` type and TypeScript error suppression directives disable type checking and defeat the purpose of using TypeScript. They hide real type issues that can cause runtime errors.
+
+Type errors should be resolved properly by defining correct interfaces, not suppressed.
+
+## No Explicit `any` Type
+
+### Why any is dangerous
+
+Using `any` disables type checking, prevents IDE autocompletion, and can mask bugs. It should be avoided in favor of proper typing or the safer `unknown` type.
+
+### Safe alternatives to any
+
+1. `unknown` - For truly unknown data (requires type guards)
+2. Union types - `string | number | boolean` for known possibilities
+3. Generic types - `<T>` for reusable functions/components
+4. Interface extensions - Extend existing types with missing properties
+5. Type assertions - `as SpecificType` with proper interfaces
+
+### Examples
+
+Incorrect:
+```typescript
+function handleData(data: any) {
+  return data.someProperty;
+}
+
+const subscription: any = stripeSubscription;
+const result: any[] = await apiCall();
+
+function process(data: any): any {
+  // ...
+}
+```
+
+Correct:
+```typescript
+interface DataType {
+  someProperty: string;
+}
+function handleData(data: DataType) {
+  return data.someProperty;
+}
+
+interface StripeSubscriptionWithPeriod extends Stripe.Subscription {
+  current_period_start: number;
+  current_period_end: number;
+}
+const subscription = stripeSubscription as StripeSubscriptionWithPeriod;
+
+interface ApiResult {
+  id: string;
+  name: string;
+}
+const result: ApiResult[] = await apiCall();
+
+function process<T>(data: T): T {
+  // ...
+}
+// OR
+function process(data: unknown): ProcessedData {
+  // ...
+}
+```
+
+### Type extension pattern
+
+For external libraries missing type definitions:
+
+Incorrect:
+```typescript
+const stripeObject: any = subscription;
+```
+
+Correct:
+```typescript
+interface ExtendedStripeSubscription extends Stripe.Subscription {
+  current_period_start: number;
+  current_period_end: number;
+}
+
+const stripeObject = subscription as ExtendedStripeSubscription;
+```
+
+## No @ts-expect-error or @ts-ignore
+
+### Why error suppression is dangerous
+
+TypeScript errors indicate type mismatches that can cause runtime issues. Suppressing them masks problems instead of fixing them.
+
+### Examples
+
+Incorrect:
+```typescript
+// @ts-expect-error - DialogContent has type definition issues
+<DialogContent className="max-w-lg">
+  <div>Content</div>
+</DialogContent>
+
+// @ts-ignore
+const result = someFunction(invalidArgument);
+
+// @ts-expect-error
+const data = response.data;
+```
+
+Correct:
+```typescript
+// Option 1: Component composition
+<DialogContent>
+  <div className="max-w-lg">
+    <div>Content</div>
+  </div>
+</DialogContent>
+
+// Option 2: Wrapper component with proper types
+const StyledDialogContent = ({ children, ...props }) => (
+  <DialogContent {...props}>
+    {children}
+  </DialogContent>
+);
+
+// Option 3: Type assertion with proper interface
+<DialogContent {...({className: "max-w-lg"} as ComponentProps<typeof DialogContent>)}>
+  <div>Content</div>
+</DialogContent>
+
+// Fix argument type
+const result = someFunction(validArgument);
+
+// Proper type assertion
+const data = response.data as ExpectedType;
+```
+
+### Component wrappers for type safety
+
+For shadcn/ui or third-party components with type issues:
+
+Incorrect:
+```typescript
+// @ts-expect-error - DialogContent has type issues
+<DialogContent className="custom-class">
+```
+
+Correct:
+```typescript
+// Option 1: Component composition
+<DialogContent>
+  <div className="custom-class">
+    {/* content */}
+  </div>
+</DialogContent>
+
+// Option 2: Typed wrapper
+interface StyledDialogProps {
+  className?: string;
+  children: React.ReactNode;
+}
+
+const StyledDialog: React.FC<StyledDialogProps> = ({ className, children }) => (
+  <DialogContent>
+    <div className={className}>
+      {children}
+    </div>
+  </DialogContent>
+);
+```
+
+### Type assertions with interfaces
+
+Incorrect:
+```typescript
+// @ts-ignore - third party library types missing
+library.someMethod(data);
+```
+
+Correct:
+```typescript
+interface LibraryMethod {
+  someMethod: (data: DataType) => ReturnType;
+}
+(library as LibraryMethod).someMethod(data);
+```
+
+### Using unknown for truly unknown data
+
+Incorrect:
+```typescript
+// @ts-expect-error
+function processData(data: any) {
+  return data.someProperty;
+}
+```
+
+Correct:
+```typescript
+function processData(data: unknown) {
+  if (typeof data === 'object' && data !== null && 'someProperty' in data) {
+    return (data as { someProperty: unknown }).someProperty;
+  }
+  throw new Error('Invalid data format');
+}
+```
+
+## Proper Solutions Summary
+
+### For component type issues
+1. Use component composition (wrapper divs)
+2. Create properly typed wrapper components
+3. Use type assertions with defined interfaces
+4. Use ComponentProps utility type
+
+### For function parameters
+1. Define specific interfaces for known structures
+2. Use `unknown` with type guards for unknown data
+3. Use generic types for reusable code
+4. Extend existing types when needed
+
+### For external library gaps
+1. Create interface extensions
+2. Define missing type declarations
+3. Use type assertions with proper interfaces
+4. Never use `any` as a shortcut
+
+## Exceptions
+
+There are NO acceptable exceptions for using `any` or TypeScript error suppression in this codebase.
+
+If you encounter type errors:
+1. Understand the root cause of the type mismatch
+2. Fix the types by defining proper interfaces
+3. Refactor the code if needed to work with the type system
+4. Create wrapper components if working around third-party limitations
+
+## Checklist for the Assistant
+
+- [ ] Never suggest `any` type annotations
+- [ ] Never suggest `@ts-expect-error` in any context
+- [ ] Never suggest `@ts-ignore` in any context
+- [ ] Always define proper interfaces for object structures
+- [ ] Use `unknown` instead of `any` for truly unknown data
+- [ ] Create type extensions for external libraries missing properties
+- [ ] Use generic types for reusable functions and components
+- [ ] Prefer union types over `any` for known possibilities
+- [ ] Create wrapper components when needed for type safety
+- [ ] Use proper type assertions with defined interfaces
+
+## Remember
+
+TypeScript errors exist to prevent runtime issues. Suppressing them or using `any` defeats the purpose of using TypeScript and can introduce bugs. Always fix the root cause with proper types.

@@ -1,0 +1,210 @@
+---
+description: 
+globs: *.py
+alwaysApply: false
+---
+# Python Provide All Required Parameters
+
+## Context
+Missing required parameters in function calls and model instantiation leads to runtime errors and mypy type checking failures. All required parameters must be provided when calling functions or creating instances of classes/models. This rule prevents `Arguments missing for parameters` errors and ensures code correctness.
+
+## Rule
+1. **All required parameters must be provided** when calling functions or creating instances.
+2. **Use proper default values** for optional parameters in function definitions.
+3. **Use `default=None` or `default_factory=dict`** for optional Pydantic model fields.
+4. **Check function signatures** before calling to ensure all required parameters are included.
+5. **Use keyword arguments** for clarity when calling functions with many parameters.
+
+## Examples
+
+### ❌ Bad (Missing Required Parameters)
+```python
+# Function definition
+def process_file(file_path: str, user_id: str, mode: str = "read") -> None:
+    pass
+
+# Bad call - missing required parameters
+process_file("file.txt")  # Missing user_id
+
+# Pydantic model with missing defaults
+class ProcessingJob(BaseModel):
+    job_id: str
+    user_id: str
+    status: str
+    created_at: datetime
+    started_at: Optional[datetime]  # Missing default
+    completed_at: Optional[datetime]  # Missing default
+
+# Bad instantiation
+job = ProcessingJob(
+    job_id="123",
+    user_id="user1",
+    status="pending",
+    created_at=datetime.utcnow()
+    # Missing started_at and completed_at defaults
+)
+```
+
+### ✅ Good (All Required Parameters Provided)
+```python
+# Function definition with proper defaults
+def process_file(file_path: str, user_id: str, mode: str = "read") -> None:
+    pass
+
+# Good call - all required parameters provided
+process_file("file.txt", "user123")
+process_file("file.txt", "user123", "write")
+
+# Good call with keyword arguments
+process_file(
+    file_path="file.txt",
+    user_id="user123",
+    mode="write"
+)
+
+# Pydantic model with proper defaults
+class ProcessingJob(BaseModel):
+    job_id: str
+    user_id: str
+    status: str
+    created_at: datetime
+    started_at: Optional[datetime] = Field(default=None)
+    completed_at: Optional[datetime] = Field(default=None)
+
+# Good instantiation
+job = ProcessingJob(
+    job_id="123",
+    user_id="user1",
+    status="pending",
+    created_at=datetime.utcnow()
+)
+```
+
+## Common Patterns
+
+### Function Definitions
+```python
+# Good - Optional parameters have defaults
+def create_user(
+    name: str,
+    email: str,
+    age: Optional[int] = None,
+    is_active: bool = True
+) -> User:
+    return User(name=name, email=email, age=age, is_active=is_active)
+
+# Good - Complex defaults use default_factory
+def process_data(
+    data: List[str],
+    options: Dict[str, str] = None
+) -> ProcessingResult:
+    if options is None:
+        options = {}
+    return ProcessingResult(data=data, options=options)
+```
+
+### Pydantic Models
+```python
+# Good - Proper defaults for optional fields
+class UserModel(BaseModel):
+    id: str
+    name: str
+    email: str
+    age: Optional[int] = Field(default=None)
+    is_active: bool = Field(default=True)
+    metadata: Dict[str, str] = Field(default_factory=dict)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+```
+
+### Class Instantiation
+```python
+# Good - All required parameters provided
+user = UserModel(
+    id="user123",
+    name="John Doe",
+    email="john@example.com"
+)
+
+# Good - Optional parameters can be omitted
+user = UserModel(
+    id="user123",
+    name="John Doe", 
+    email="john@example.com",
+    age=25,
+    is_active=False
+)
+```
+
+## Mypy Error Prevention
+This rule prevents these common mypy errors:
+- `Arguments missing for parameters "param1", "param2"`
+- `Missing required argument "param" in function call`
+- `Too few arguments for function call`
+
+## Best Practices
+
+### 1. Use Field() for Pydantic Models
+```python
+# Good
+class Config(BaseModel):
+    name: str
+    debug: bool = Field(default=False)
+    timeout: int = Field(default=30, gt=0)
+    tags: List[str] = Field(default_factory=list)
+```
+
+### 2. Use Keyword Arguments for Clarity
+```python
+# Good - Clear what each parameter represents
+result = process_file(
+    file_path="/path/to/file.txt",
+    user_id="user123",
+    mode="read",
+    timeout=30
+)
+```
+
+### 3. Group Related Parameters
+```python
+# Good - Related parameters grouped together
+def create_database_connection(
+    host: str,
+    port: int,
+    database: str,
+    username: str,
+    password: str,
+    pool_size: int = 10,
+    timeout: int = 30,
+    ssl_enabled: bool = True
+) -> Connection:
+    pass
+```
+
+### 4. Use TypedDict for Complex Parameters
+```python
+# Good - Use TypedDict for complex parameter structures
+class ConnectionConfig(TypedDict):
+    host: str
+    port: int
+    database: str
+    username: str
+    password: str
+    pool_size: int
+    timeout: int
+    ssl_enabled: bool
+
+def create_connection(config: ConnectionConfig) -> Connection:
+    pass
+```
+
+## Checklist for the Assistant
+- [ ] Check function signatures before calling functions
+- [ ] Provide all required parameters in function calls
+- [ ] Use proper default values for optional parameters
+- [ ] Use `Field(default=None)` for optional Pydantic model fields
+- [ ] Use `Field(default_factory=dict)` for mutable defaults
+- [ ] Use keyword arguments for functions with many parameters
+- [ ] Validate that all required fields are provided in model instantiation
+- [ ] Consider using TypedDict for complex parameter structures
+
+This ensures all required parameters are provided and prevents runtime errors and mypy type checking failures.

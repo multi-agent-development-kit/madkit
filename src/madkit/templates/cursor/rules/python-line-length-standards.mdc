@@ -1,0 +1,164 @@
+---
+description: 
+globs: *.py
+alwaysApply: false
+---
+# Python Line Length Standards (88 Characters)
+
+## Context
+Modern Python development has moved away from the outdated 79-character line limit to **88 characters** as the standard. This provides better readability while maintaining reasonable line lengths for modern development environments.
+
+This standard is used by Black formatter, Ruff linter, and is widely adopted in the Python community as a more practical limit for today's wider screens and development tools.
+
+## Rule
+**ALWAYS use 88 characters as the line length limit for Python code:**
+
+### Historical Context
+- **79 characters**: PEP 8 original recommendation (1990s terminal limitations)
+- **88 characters**: Modern standard adopted by Black, Ruff, and Python community
+- **Rationale**: Better readability, modern displays, practical development
+
+### Tool Configuration
+All Python code quality tools should be configured consistently:
+
+## Black Configuration
+```toml
+[tool.black]
+line-length = 88
+target-version = ['py310']
+```
+
+## Ruff Configuration
+```toml
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+
+[tool.ruff.lint]
+# Don't enforce E501 (line too long) - handled by Black
+ignore = ["E501"]
+```
+
+## mypy Configuration
+```toml
+[tool.mypy]
+# No specific line length config - defers to Black/Ruff
+```
+
+## Examples
+
+### ❌ Bad (Overly restrictive 79-char limit)
+```python
+def process_complex_data_with_multiple_parameters(
+    data: dict[str, list[str]], 
+    options: dict[str, str | int] | None = None,
+    callback: Callable[[ProcessingResult], None] | None = None
+) -> list[ProcessingResult]:
+    # Lines broken too early due to 79-char limit
+    result = await complex_processing_service.process_data_with_advanced_options(
+        data, options, callback
+    )
+    return result
+```
+
+### ✅ Good (Modern 88-char limit)
+```python
+def process_complex_data_with_multiple_parameters(
+    data: dict[str, list[str]], 
+    options: dict[str, str | int] | None = None,
+    callback: Callable[[ProcessingResult], None] | None = None,
+) -> list[ProcessingResult]:
+    # Better readability with 88-char limit
+    result = await complex_processing_service.process_data_with_advanced_options(
+        data, options, callback
+    )
+    return result
+```
+
+### Function Signatures
+```python
+# Good - fits naturally within 88 characters
+async def store_multimodal_chunks(
+    chunks: list[ChunkData], user_id: str, document_id: str
+) -> None:
+    """Store multimodal chunks in the database."""
+    pass
+
+# Also good - reasonable breaks for longer signatures
+async def process_file_with_advanced_options(
+    file_path: str, 
+    processing_options: dict[str, str | int],
+    callback: Callable[[ProcessingResult], None] | None = None,
+) -> ProcessingResult:
+    """Process file with advanced configuration options."""
+    pass
+```
+
+## Benefits of 88 Characters
+
+### Developer Experience
+- **Better readability** on modern screens
+- **Fewer forced line breaks** in natural code
+- **Consistent with Black formatter** (industry standard)
+- **Practical for modern development** environments
+
+### Code Quality
+- **Natural flow** of code statements
+- **Less artificial formatting** constraints
+- **Better diff readability** in code reviews
+- **Consistent with modern Python ecosystem**
+
+## IDE/Editor Setup
+Configure your editor to show the 88-character line:
+
+### VS Code
+```json
+{
+  "python.formatting.provider": "black",
+  "python.linting.enabled": true,
+  "python.linting.ruffEnabled": true,
+  "editor.rulers": [88]
+}
+```
+
+### PyCharm
+```
+Settings > Editor > Code Style > Python > Right margin: 88
+```
+
+## Validation Commands
+```bash
+# Check line length with Ruff
+uv run --group lint ruff check --select E501 .
+
+# Format with Black (88 chars default)
+uv run --group lint black .
+
+# Check formatting
+uv run --group lint black --check .
+```
+
+## pyproject.toml Template
+```toml
+[tool.black]
+line-length = 88
+target-version = ['py310']
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "C4", "UP", "N"]
+ignore = ["E501"]  # Black handles line length
+```
+
+## Checklist for the Assistant
+- [ ] Configure all Python tools to use 88-character line length
+- [ ] Use Black formatter with default 88-char setting
+- [ ] Configure Ruff to ignore E501 (defers to Black)
+- [ ] Set editor rulers/guides to 88 characters
+- [ ] Don't artificially break lines before 88 characters
+- [ ] Ensure consistent configuration across all Python projects
+
+This ensures modern, readable Python code that follows current community standards and tool defaults.

@@ -1,0 +1,220 @@
+---
+description: 
+globs: *.tsx
+alwaysApply: false
+---
+# No Async Client Components - Separate Server and Client Concerns
+
+## Context
+In Next.js 13+ App Router, only **Server Components** can be async. Client Components (marked with `'use client'`) cannot be async functions. This commonly occurs when developers try to mix server-side data fetching with client-side interactivity in the same component.
+
+The error typically appears as:
+```
+<ComponentName> is an async Client Component. Only Server Components can be async at the moment. This error is often caused by accidentally adding `'use client'` to a module that was originally written for the server.
+```
+
+This happens when a file has `'use client'` at the top but contains async functions that fetch data or perform server-side operations.
+
+## Rule
+1. **Never make Client Components async** - Components marked with `'use client'` cannot use `async/await`.
+2. **Separate data fetching from interactivity** - Move async data fetching to Server Components and interactive logic to Client Components.
+3. **Use proper component architecture** - Create separate files for server and client concerns when needed.
+4. **Pass data down** - Server Components should fetch data and pass it to Client Components as props.
+
+## Component Architecture Patterns
+
+### Pattern 1: Separate Files
+| ❌ Bad (Mixed Concerns) | ✅ Good (Separated Concerns) |
+|---|---|
+| ```tsx
+// page.tsx
+"use client";
+import { useState } from "react";
+import { getData } from "@/actions";
+
+// ❌ This will cause an error
+async function MyComponent() {
+  const [state, setState] = useState(false);
+  const data = await getData(); // ❌ async in client component
+  
+  return (
+    <div>
+      <button onClick={() => setState(!state)}>
+        Toggle
+      </button>
+      {data.map(item => <div key={item.id}>{item.name}</div>)}
+    </div>
+  );
+}
+``` | ```tsx
+// MyComponentClient.tsx (Client Component)
+"use client";
+import { useState } from "react";
+
+interface Props {
+  data: DataType[];
+}
+
+export function MyComponentClient({ data }: Props) {
+  const [state, setState] = useState(false);
+  
+  return (
+    <div>
+      <button onClick={() => setState(!state)}>
+        Toggle
+      </button>
+      {data.map(item => <div key={item.id}>{item.name}</div>)}
+    </div>
+  );
+}
+
+// page.tsx (Server Component)
+import { getData } from "@/actions";
+import { MyComponentClient } from "./MyComponentClient";
+
+export default async function Page() {
+  const data = await getData(); // ✅ async in server component
+  
+  return <MyComponentClient data={data} />;
+}
+``` |
+
+### Pattern 2: Wrapper Components
+```tsx
+// Server Component wrapper for data fetching
+async function DataWrapper() {
+  const data = await fetchData();
+  
+  if (!data.success) {
+    return <ErrorDisplay message="Failed to load data" />;
+  }
+  
+  return <InteractiveClient data={data.items} />;
+}
+
+// Client Component for interactivity
+"use client";
+function InteractiveClient({ data }: { data: Item[] }) {
+  const [selected, setSelected] = useState<string | null>(null);
+  
+  return (
+    <div>
+      {data.map(item => (
+        <button 
+          key={item.id}
+          onClick={() => setSelected(item.id)}
+          className={selected === item.id ? "selected" : ""}
+        >
+          {item.name}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// Main page combines them
+export default function Page() {
+  return (
+    <div>
+      <h1>My Page</h1>
+      <Suspense fallback={<Loading />}>
+        <DataWrapper />
+      </Suspense>
+    </div>
+  );
+}
+```
+
+## Real Example: Admin Models Page Fix
+
+The `ModelsTableWrapper` error was fixed by separating concerns:
+
+```tsx
+// ❌ Before: Mixed concerns in one file
+"use client";
+
+async function ModelsTableWrapper() { // ❌ async Client Component
+  const result = await getAllModelsForAdmin();
+  return <ModelsTable models={result.models} />;
+}
+
+export default function AdminModelsPage() {
+  const [showDialog, setShowDialog] = useState(false); // Client state
+  
+  return (
+    <div>
+      <Button onClick={() => setShowDialog(true)}>Add Model</Button>
+      <ModelsTableWrapper /> {/* ❌ This causes the error */}
+    </div>
+  );
+}
+```
+
+```tsx
+// ✅ After: Separated into proper architecture
+
+// ModelsComponents.tsx (Client Component)
+"use client";
+export function AdminModelsPageClient() {
+  const [showDialog, setShowDialog] = useState(false);
+  
+  return (
+    <>
+      <Button onClick={() => setShowDialog(true)}>Add Model</Button>
+      <AddModelDialog open={showDialog} onOpenChange={setShowDialog} />
+    </>
+  );
+}
+
+export function ModelsTableClient({ models }: { models: AiModel[] }) {
+  return <ModelsTable models={models} />;
+}
+
+// page.tsx (Server Component)
+import { getAllModelsForAdmin } from "@/app/actions/models";
+import { AdminModelsPageClient, ModelsTableClient } from "./ModelsComponents";
+
+async function ModelsTableWrapper() { // ✅ async Server Component
+  const result = await getAllModelsForAdmin();
+  if (!result.success) return <ErrorDisplay />;
+  return <ModelsTableClient models={result.models} />;
+}
+
+export default function AdminModelsPage() {
+  return (
+    <div>
+      <AdminModelsPageClient />
+      <Suspense fallback={<LoadingSkeleton />}>
+        <ModelsTableWrapper />
+      </Suspense>
+    </div>
+  );
+}
+```
+
+## Common Scenarios
+
+1. **Data Tables** - Server Component fetches data, Client Component handles sorting/filtering
+2. **Forms with Dynamic Data** - Server Component loads options, Client Component handles form state
+3. **Admin Dashboards** - Server Component loads stats, Client Component handles interactions
+4. **Modal/Dialog Triggers** - Server Component loads content, Client Component manages modal state
+
+## Migration Steps
+
+When encountering this error:
+
+1. **Identify the async operation** - Find what's causing the component to be async
+2. **Extract server logic** - Move data fetching to a separate Server Component
+3. **Extract client logic** - Move interactive state to a separate Client Component  
+4. **Connect with props** - Pass data from Server to Client Components
+5. **Add Suspense boundaries** - Wrap async components in Suspense for loading states
+
+## Checklist for the Assistant
+- [ ] Never suggest making Client Components async
+- [ ] When data fetching and interactivity are needed, separate into different components
+- [ ] Server Components handle async operations and data fetching
+- [ ] Client Components handle user interactions and state management
+- [ ] Use Suspense boundaries for async Server Components
+- [ ] Pass data via props from Server to Client Components
+
+This ensures proper separation of concerns and follows Next.js App Router best practices.

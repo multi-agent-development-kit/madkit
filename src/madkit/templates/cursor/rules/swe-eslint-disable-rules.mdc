@@ -1,0 +1,236 @@
+---
+description: Never use eslint-disable comments - always fix the root cause instead
+globs: *.ts,*.tsx
+alwaysApply: false
+---
+
+# Never Use ESLint Disable Comments - Zero Tolerance Policy
+
+## Rule
+
+FORBIDDEN: All forms of ESLint disable directives:
+- `/* eslint-disable */`
+- `/* eslint-disable-next-line */`
+- `// eslint-disable-next-line`
+- `/* eslint-disable rule-name */`
+- `// eslint-disable-next-line rule-name`
+- `/* eslint-disable-line */`
+- Any variant of the above
+
+ALWAYS fix the root cause instead of disabling the rule.
+
+## Context
+
+ESLint rules exist to prevent real bugs, performance issues, security vulnerabilities, maintainability problems, and accessibility violations. Disabling rules means these problems go undetected and can cause runtime errors, poor UX, security breaches, and technical debt.
+
+This is a ZERO TOLERANCE policy - there are NO acceptable exceptions.
+
+## Common Rules and Proper Fixes
+
+### react-hooks/exhaustive-deps
+
+Never disable this rule. Missing dependencies cause stale closures, incorrect effect behavior, and subtle bugs.
+
+Incorrect:
+```tsx
+useEffect(() => {
+  fetchData(userId);
+// eslint-disable-next-line react-hooks/exhaustive-deps
+}, []);
+```
+
+Correct solutions:
+```tsx
+// Option 1: Add missing dependencies
+useEffect(() => {
+  fetchData(userId);
+}, [userId, fetchData]);
+
+// Option 2: Move function inside effect
+useEffect(() => {
+  function fetchData() {
+    // logic here using userId
+  }
+  fetchData();
+}, [userId]);
+
+// Option 3: Use useCallback to stabilize function
+const fetchData = useCallback(() => {
+  // logic here
+}, [actualDependencies]);
+
+useEffect(() => {
+  fetchData();
+}, [fetchData]);
+
+// Option 4: Use trigger state to break circular dependencies
+const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+useEffect(() => {
+  if (refreshTrigger > 0) {
+    fetchData();
+  }
+}, [refreshTrigger]);
+```
+
+### react/no-unescaped-entities
+
+Never disable this rule. Unescaped quotes and apostrophes can break HTML rendering.
+
+Incorrect:
+```tsx
+// eslint-disable-next-line react/no-unescaped-entities
+<p>Sarah's workflow</p>
+```
+
+Correct:
+```tsx
+<p>Sarah&rsquo;s workflow</p>
+// OR
+<p>{"Sarah's workflow"}</p>
+```
+
+### no-constant-condition
+
+Never use `while (true)` loops. Use recursive patterns for stream processing.
+
+Incorrect:
+```typescript
+// eslint-disable-next-line no-constant-condition
+while (true) {
+  const { done, value } = await reader.read();
+  if (done) break;
+  // process value
+}
+```
+
+Correct:
+```typescript
+const pump = async () => {
+  const { done, value } = await reader.read();
+  if (done) return;
+
+  // Process chunk
+  const chunk = decoder.decode(value, { stream: true });
+  // ... handle chunk ...
+
+  return pump(); // Recursive call
+};
+
+await pump();
+```
+
+### @typescript-eslint/no-explicit-any
+
+Incorrect:
+```tsx
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const data: any = response;
+```
+
+Correct:
+```tsx
+interface ResponseType {
+  id: string;
+  name: string;
+}
+const data: ResponseType = response;
+```
+
+### jsx-a11y/alt-text
+
+Incorrect:
+```tsx
+// eslint-disable-next-line jsx-a11y/alt-text
+<img src="photo.jpg" />
+```
+
+Correct:
+```tsx
+<img src="photo.jpg" alt="Description of photo" />
+// OR for decorative images
+<img src="photo.jpg" alt="" aria-hidden="true" />
+```
+
+### @typescript-eslint/no-unused-vars
+
+Incorrect:
+```tsx
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const unusedVar = getValue();
+```
+
+Correct:
+```tsx
+// Remove if truly unused
+// OR prefix with underscore if intentionally unused
+const _unusedVar = getValue();
+// OR actually use the variable
+const neededVar = getValue();
+doSomethingWith(neededVar);
+```
+
+## Root Cause Analysis Process
+
+When ESLint flags an issue:
+
+1. Read the error message - ESLint tells you exactly what's wrong
+2. Understand the rule's purpose - What is it preventing?
+3. Identify the real problem - What needs to change in the code structure?
+4. Apply the proper fix - Refactor, add dependencies, fix types, improve accessibility
+5. Verify the solution - Ensure code still works and is more robust
+
+## Benefits of Fixing Root Causes
+
+1. More robust code that handles edge cases properly
+2. Better performance by addressing inefficient patterns
+3. Improved accessibility by fixing real a11y issues
+4. Enhanced type safety with proper TypeScript types
+5. Consistent patterns following project conventions
+6. Easier debugging because code follows predictable rules
+7. Fewer production bugs because issues are caught early
+
+## When You Think You Need to Disable a Rule
+
+STOP - You don't. Instead:
+
+1. Research the rule - Read the ESLint documentation
+2. Understand the purpose - What real problem is it preventing?
+3. Find the proper solution - Every ESLint error has a correct fix
+4. Refactor if needed - Sometimes the rule reveals deeper architectural issues
+5. Ask for help if stuck - But never disable the rule
+
+## Project-Specific Patterns
+
+Common fixes in this codebase:
+- React hooks: Include all dependencies, use useCallback for stability
+- TypeScript: Define proper interfaces instead of using `any`
+- Accessibility: Add proper ARIA attributes and alt text
+- JSX: Use HTML entities for quotes and apostrophes
+- Imports: Remove unused imports, organize properly
+- Stream processing: Use recursive pump functions instead of while(true)
+
+## Enforcement
+
+This rule is enforced by:
+- Code review process
+- Automated linting in CI/CD
+- Pre-commit hooks
+- Regular codebase audits
+
+Any code containing eslint-disable comments will be rejected.
+
+## Checklist for the Assistant
+
+- [ ] NEVER suggest any form of eslint-disable comment under any circumstances
+- [ ] When encountering ESLint errors, always analyze the root cause
+- [ ] Research the specific rule's purpose and recommended solutions
+- [ ] Provide proper fixes that address the underlying issue
+- [ ] Test that fixes actually resolve issues without breaking functionality
+- [ ] Ensure fixes follow project patterns and conventions
+
+## Remember
+
+ESLint rules are guardrails that keep code safe, performant, and maintainable. Disabling them is like removing safety equipment - it might seem easier in the moment, but it creates dangerous conditions that will cause problems later.
+
+When in doubt, fix the code - never disable the rule.

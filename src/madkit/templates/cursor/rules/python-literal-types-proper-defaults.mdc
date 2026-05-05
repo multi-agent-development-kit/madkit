@@ -1,0 +1,148 @@
+---
+description: 
+globs: *.py
+alwaysApply: false
+---
+# Python Literal Types - Proper Default Values
+
+## Context
+When using `Literal` types in Python function parameters or Pydantic model fields, the default values must match exactly with the literal values. Using string constants instead of the actual literal values causes mypy assignment errors.
+
+Common mypy errors:
+- `Incompatible default for argument "param" (default has type "str", argument has type "Literal['value1', 'value2']")  [assignment]`
+
+## Rule
+**ALWAYS use the actual literal values as defaults, not string constants:**
+
+1. **Import Literal values from constants** - Don't use raw strings  
+2. **Use constant values as defaults** - Match the literal type exactly
+3. **Keep constants and literals in sync** - Single source of truth
+
+## Examples
+
+### ❌ Bad (String constants as defaults)
+```python
+from typing import Literal
+
+class ContentTypes:
+    VIDEO = "video"
+    AUDIO = "audio"
+    
+# WRONG: Using string literal as default
+def create_metadata(
+    content_type: Literal["video", "audio"] = "video"  # ❌ mypy error!
+) -> None:
+    pass
+
+# WRONG: Pydantic field with string default
+class Metadata(BaseModel):
+    content_type: Literal["video", "audio"] = "video"  # ❌ mypy error!
+```
+
+### ✅ Good (Proper literal defaults)
+```python
+from typing import Literal
+
+class ContentTypes:
+    VIDEO = "video"
+    AUDIO = "audio"
+
+# Type alias for reusability
+ContentType = Literal["video", "audio"]
+
+# CORRECT: Using constant value as default
+def create_metadata(
+    content_type: ContentType = ContentTypes.VIDEO  # ✅ Proper!
+) -> None:
+    pass
+
+# CORRECT: Pydantic field with constant default  
+class Metadata(BaseModel):
+    content_type: ContentType = Field(
+        default=ContentTypes.VIDEO,  # ✅ Uses constant
+        description="Content type"
+    )
+```
+
+## Best Practices
+
+### 1. Define Constants Class
+```python
+class ContentTypes:
+    VIDEO = "video"
+    AUDIO = "audio" 
+    IMAGE = "image"
+    DOCUMENT = "document"
+
+class EmbeddingTypes:
+    TEXT = "text"
+    MULTIMODAL = "multimodal"
+```
+
+### 2. Create Type Aliases
+```python
+ContentType = Literal["video", "audio", "image", "document"]
+EmbeddingType = Literal["text", "multimodal"]
+```
+
+### 3. Use Constants in Defaults
+```python
+def create_video_metadata(
+    content_type: ContentType = ContentTypes.VIDEO,
+    embedding_type: EmbeddingType = EmbeddingTypes.MULTIMODAL
+) -> VideoMetadata:
+    pass
+```
+
+### 4. Pydantic Models
+```python
+class VideoChunkMetadata(BaseModel):
+    content_type: Literal["video"] = Field(
+        default=ContentTypes.VIDEO,
+        description="Content type discriminator"
+    )
+    embedding_type: EmbeddingType = Field(
+        default=EmbeddingTypes.MULTIMODAL,
+        description="Type of embedding"
+    )
+```
+
+## Common Patterns
+
+### Function Parameters
+```python
+# ✅ Good pattern
+def process_content(
+    content_type: ContentType = ContentTypes.DOCUMENT,
+    embedding_type: EmbeddingType = EmbeddingTypes.TEXT
+) -> ProcessingResult:
+    pass
+```
+
+### Enum Alternative (When Appropriate)
+```python
+from enum import Enum
+
+class ContentType(str, Enum):
+    VIDEO = "video"
+    AUDIO = "audio"
+    IMAGE = "image" 
+    DOCUMENT = "document"
+
+# Use enum value as default
+def process_content(
+    content_type: ContentType = ContentType.DOCUMENT
+) -> ProcessingResult:
+    pass
+```
+
+## Checklist for the Assistant
+- [ ] All `Literal` type parameters use constant values as defaults
+- [ ] No raw string literals as defaults for `Literal` types
+- [ ] Constants classes are defined for string literals
+- [ ] Type aliases are created for complex `Literal` types
+- [ ] Pydantic fields use `Field()` with constant defaults
+- [ ] Consider using Enums for related literal values
+- [ ] Import statements include all necessary typing components
+
+This prevents `[assignment]` errors when using Literal types with default values.

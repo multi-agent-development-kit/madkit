@@ -6,13 +6,14 @@ from pathlib import Path
 import typer
 
 from madkit.adapters.claude import ClaudeAdapter
+from madkit.adapters.cursor import CursorAdapter
 from madkit.adapters.detector import detect_ide
 from madkit.i18n import t
 
 VALID_IDE_OPTIONS = frozenset({"auto", "claude", "cursor", "codex", "all"})
 
-# IDEs implementados en esta versión (alpha). Cursor + codex llegan en B/C.
-IMPLEMENTED_ADAPTERS = {"claude": ClaudeAdapter}
+# IDEs implementados en esta versión (alpha). Codex llega en sub-fase C.
+IMPLEMENTED_ADAPTERS = {"claude": ClaudeAdapter, "cursor": CursorAdapter}
 
 # Subdirectorios de ai_docs/ creados por bootstrap
 AI_DOCS_SUBDIRS = ("core", "tasks", "refs")
@@ -79,8 +80,8 @@ def run(
             typer.echo(t("init_err_already_initialized"), err=True)
             raise typer.Exit(code=1)
 
-        if adapter_key == "claude" and not quiet:
-            typer.echo(t("init_copying_claude"))
+        if not quiet:
+            typer.echo(t(f"init_copying_{adapter_key}"))
 
         try:
             deployed_paths.extend(adapter.deploy(project_path, force=force))
@@ -97,8 +98,9 @@ def run(
     if not quiet:
         typer.echo("")
         typer.echo(t("init_done"))
-        if "claude" in adapters_to_run:
-            typer.echo(t("init_next_step_claude"))
+        for adapter_key in adapters_to_run:
+            if adapter_key in IMPLEMENTED_ADAPTERS:
+                typer.echo(t(f"init_next_step_{adapter_key}"))
 
     raise typer.Exit(code=0)
 

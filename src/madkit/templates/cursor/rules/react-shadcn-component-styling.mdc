@@ -1,0 +1,46 @@
+---
+description: 
+globs: *tsx
+alwaysApply: false
+---
+# Style Shadcn Components at the Source, Not at the Call-Site
+
+## Context
+Shadcn UI components under `@/components/ui` (import alias `@/ui`) expose **variants** and **sizes** via `class-variance-authority` (CVA). These centralise Tailwind classes so every instance stays visually consistent and updates propagate everywhere.
+
+Ad-hoc Tailwind classes added directly at the usage site (e.g. via `className` on `<Button>` or `<Sheet>`) quickly become un-tracked one-offs, defeating the design system and bloating markup.
+
+## Rule
+1. **Do not** tack on arbitrary Tailwind classes via `className` when using any component from `@/ui`.
+2. If the desired look already exists, consume it through the documented `variant`, `size`, or other props.
+3. If the design requires new styling:
+   • Extend the component's CVA declaration (e.g. `buttonVariants`) with a new `variant`/`size`, _or_
+   • Adjust the default style inside the source file.
+4. After updating the root component, importers should remain clean:
+
+   ```tsx
+   // ✅ Good – uses a variant defined in components/ui/button.tsx
+   <Button variant="outlinePrimary">Save</Button>
+   ```
+
+## Examples
+| ❌ Bad (inline styling) | ✅ Good (centralised) |
+|------------------------|-----------------------|
+| ```tsx
+  <Button
+    variant="outline"
+    className="hidden sm:inline-flex bg-white/90 dark:bg-gray-800/80 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700"
+  >
+    ...
+  </Button>
+  ``` | ```tsx
+  // Add a new variant in components/ui/button.tsx:
+  //   outlineMuted: "hidden sm:inline-flex bg-white/90 ..."
+  // Then consume it uniformly:
+  <Button variant="outlineMuted">...</Button>
+  ``` |
+
+## Checklist for the Assistant
+- [ ] Never suggest adding custom Tailwind classes via `className` on Shadcn components.
+- [ ] Instead, instruct to extend the component's CVA map (variants/sizes/etc.).
+- [ ] Ensure resulting usages import only the new prop values, keeping call-sites minimal.
