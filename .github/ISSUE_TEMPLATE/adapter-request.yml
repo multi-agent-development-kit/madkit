@@ -1,0 +1,27 @@
+name: Solicitar adapter de IDE
+description: Pide soporte para un IDE/CLI no cubierto (Cline, Continue, Windsurf, Aider…)
+labels: ["enhancement", "area:adapter-new"]
+body:
+  - type: input
+    id: ide
+    attributes:
+      label: Nombre del IDE / CLI
+      placeholder: Cline / Continue / Windsurf / etc.
+    validations:
+      required: true
+  - type: textarea
+    id: scaffolding
+    attributes:
+      label: Formato de scaffolding del IDE
+      description: ¿Qué archivos/carpetas espera el IDE? (`.cline/`, `.continuerc.json`, etc.)
+    validations:
+      required: true
+  - type: textarea
+    id: features
+    attributes:
+      label: Features del IDE relevantes
+      description: ¿Soporta hooks, subagents, skills, slash commands? ¿Qué primitivas?
+  - type: textarea
+    id: usage
+    attributes:
+      label: Tu caso de uso

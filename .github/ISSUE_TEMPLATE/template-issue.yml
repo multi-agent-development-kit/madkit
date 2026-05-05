@@ -1,0 +1,33 @@
+name: Problema con un template
+description: Un template (skill, agent, command, hook) tiene un fallo o necesita mejora
+labels: ["area:templates"]
+body:
+  - type: dropdown
+    id: type
+    attributes:
+      label: Tipo de template
+      options:
+        - skill
+        - agent
+        - command (slash)
+        - hook
+        - CLAUDE.md.template
+    validations:
+      required: true
+  - type: input
+    id: name
+    attributes:
+      label: Nombre del template
+      placeholder: cleanup-python / task-planner / commit / etc.
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problema observado
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Propuesta de cambio (opcional)
