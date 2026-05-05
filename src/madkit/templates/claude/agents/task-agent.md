@@ -211,6 +211,8 @@ Triaje y criterio analítico se quedan en `task-planner`. La ejecución se deleg
 
 > **Nota sobre solapamiento:** `plan-checker` valida solo gaps **semánticos** del plan. Validaciones MECÁNICAS (grafo `depends_on:`, estructura del task doc, recálculo de forecast) siguen donde estaban: Paso 0.6 (deps), hook `task-doc-validator` (estructura), Paso 8 del Protocolo de Ejecución (forecast). Sin solapamiento.
 
+> **Bloque `contract:` opcional (T087):** para task docs ESTÁNDAR+ con `depends_on:` declarado o handoffs explícitos a múltiples subagents, emitir al final del task doc un bloque YAML `contract:` con campos `{task_id, complexity, depends_on, forecast, wiring, produced_by, validated_by, consumed_by}`. Schema y ejemplo en `CLAUDE.md` raíz §3.2 "Bloque `contract:` opcional (T087)" y plantilla en `task_template.md` §20. Es **opcional** — si no se emite, plan-checker sigue leyendo cabeceras blockquote + sub-bullets como hasta T086. Conviene emitirlo cuando reduce ambigüedad de handoff.
+
 ---
 
 *Versión: 3.7.0 | Actualización: 2026-05-05 — tasks 078+079+080 (Paso 0.6 deps + waves; paso 8 Forecast tamaño; paso 9 Wiring esperado; Encadenamiento Post-Triaje punto 0 = plan-checker gate)*
