@@ -33,6 +33,7 @@ dev = [
     "pytest>=8",
     "pytest-cov>=5",
     "ruff>=0.6",
+    "build>=1.2",
 ]
 
 [project.scripts]
@@ -53,6 +54,9 @@ packages = ["src/madkit"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra --strict-markers"
+markers = [
+    "slow: tests más lentos (build de wheel, e2e). Skip con `-m 'not slow'`.",
+]
 
 [tool.ruff]
 line-length = 100
