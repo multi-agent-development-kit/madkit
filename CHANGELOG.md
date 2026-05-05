@@ -2,6 +2,28 @@
 
 Todas las versiones notables se documentan aquí. Sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [SemVer](https://semver.org/lang/es/).
 
+## [0.1.3] — 2026-05-05
+
+### Añadido — Capa 3: adapters multi-IDE adicionales (task 088)
+
+- **3 adapters nuevos** en `src/madkit/adapters/`:
+  - `cline.py` (`ClineAdapter`): despliega `.clinerules` (markdown plano en raíz) + `.cline_compat/MADKIT_COMPATIBILITY.md`.
+  - `continue_dev.py` (`ContinueAdapter`): despliega `.continue/config.yaml` con `systemMessage` derivado de `CLAUDE.md` + `.continue/MADKIT_COMPATIBILITY.md`.
+  - `windsurf.py` (`WindsurfAdapter`): despliega `.windsurfrules` (markdown plano en raíz) + `.windsurf_compat/MADKIT_COMPATIBILITY.md`.
+- Cada adapter implementa `IntegrationBase` con 4 features degradados documentados (subagents-with-model, hooks, context-fork, skills-auto-activation).
+- `madkit iniciar . --ide={cline,continue,windsurf}` funciona end-to-end.
+- `madkit iniciar . --ide=all` ahora despliega los **6 IDEs** (Claude Code + Cursor + Codex + Cline + Continue + Windsurf) coexistiendo.
+- `madkit iniciar . --ide=auto` detecta `.clinerules`, `.continue/`, `.windsurfrules` correctamente.
+- 6 keys nuevas en i18n con paridad ES/EN (3 copying + 3 next-step).
+- `scripts/generate_adapters.py` extendido con 3 funciones nuevas que producen los templates desde `CLAUDE.md.template`.
+- 23 tests nuevos (8 cline + 7 continue + 8 windsurf) — todos al 100% cobertura.
+
+### Cambiado
+
+- Detector heurístico (`adapters/detector.py`): regla refinada — Claude domina sobre AGENTS.md (informativo) pero combina como "mixed" con `.cursor/`, `.cline*`, `.continue/`, `.windsurfrules` (scaffolding ejecutable de otros IDEs).
+- Total adapters: **3 → 6**. Total IDEs reconocidos por detector: 6 + mixed/unknown.
+- 120 → **146 tests** verde (1 deselected: build wheel slow). Cobertura: **95%**, los 6 adapters al 100%.
+
 ## [0.1.2] — 2026-05-05
 
 ### Añadido

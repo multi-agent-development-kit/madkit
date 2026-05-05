@@ -37,3 +37,24 @@ def test_codex_ignored_when_claude_present(tmp_path: Path) -> None:
     (tmp_path / ".claude" / "commands").mkdir(parents=True)
     (tmp_path / "AGENTS.md").write_text("test", encoding="utf-8")
     assert detect_ide(tmp_path) == "claude"
+
+
+def test_cline_when_only_clinerules(tmp_path: Path) -> None:
+    (tmp_path / ".clinerules").write_text("rules", encoding="utf-8")
+    assert detect_ide(tmp_path) == "cline"
+
+
+def test_continue_when_only_continue_dir(tmp_path: Path) -> None:
+    (tmp_path / ".continue").mkdir()
+    assert detect_ide(tmp_path) == "continue"
+
+
+def test_windsurf_when_only_windsurfrules(tmp_path: Path) -> None:
+    (tmp_path / ".windsurfrules").write_text("rules", encoding="utf-8")
+    assert detect_ide(tmp_path) == "windsurf"
+
+
+def test_mixed_when_two_non_claude_present(tmp_path: Path) -> None:
+    (tmp_path / ".clinerules").write_text("rules", encoding="utf-8")
+    (tmp_path / ".windsurfrules").write_text("rules", encoding="utf-8")
+    assert detect_ide(tmp_path) == "mixed"

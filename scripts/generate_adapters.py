@@ -94,6 +94,65 @@ def generate_codex_agents_template(
     return output
 
 
+def generate_cline_template(claude_md_template: Path, target_cline_dir: Path) -> Path:
+    """Genera `clinerules.template` para Cline (T088)."""
+    target_cline_dir.mkdir(parents=True, exist_ok=True)
+    template_content = claude_md_template.read_text(encoding="utf-8")
+    output = target_cline_dir / "clinerules.template"
+    output.write_text(
+        "# Cline Project Rules\n\n"
+        "<!-- Auto-generado desde CLAUDE.md.template por madkit (T088). -->\n"
+        "<!-- Cline lee `.clinerules` como contexto del proyecto. -->\n\n"
+        f"{template_content}\n",
+        encoding="utf-8",
+    )
+    return output
+
+
+def generate_continue_template(claude_md_template: Path, target_continue_dir: Path) -> Path:
+    """Genera `continue_config.yaml.template` para Continue (T088).
+
+    Continue espera YAML con `systemMessage` o sección equivalente. Se
+    embebe el contenido de `CLAUDE.md.template` como systemMessage en
+    formato YAML literal block.
+    """
+    target_continue_dir.mkdir(parents=True, exist_ok=True)
+    template_content = claude_md_template.read_text(encoding="utf-8")
+    # Indentar 2 espacios para que sea válido como bloque literal YAML
+    indented_content = "\n".join("  " + line for line in template_content.splitlines())
+    output = target_continue_dir / "continue_config.yaml.template"
+    output.write_text(
+        "# Continue project config\n"
+        "# Auto-generado desde CLAUDE.md.template por madkit (T088).\n"
+        "# Continue lee este archivo como configuración del proyecto.\n"
+        "\n"
+        "name: madkit-project\n"
+        "version: 0.0.1\n"
+        "schema: v1\n"
+        "\n"
+        "# Contexto del framework MAD inyectado como systemMessage\n"
+        "systemMessage: |\n"
+        f"{indented_content}\n",
+        encoding="utf-8",
+    )
+    return output
+
+
+def generate_windsurf_template(claude_md_template: Path, target_windsurf_dir: Path) -> Path:
+    """Genera `windsurfrules.template` para Windsurf (T088)."""
+    target_windsurf_dir.mkdir(parents=True, exist_ok=True)
+    template_content = claude_md_template.read_text(encoding="utf-8")
+    output = target_windsurf_dir / "windsurfrules.template"
+    output.write_text(
+        "# Windsurf Project Rules\n\n"
+        "<!-- Auto-generado desde CLAUDE.md.template por madkit (T088). -->\n"
+        "<!-- Windsurf lee `.windsurfrules` como contexto del proyecto. -->\n\n"
+        f"{template_content}\n",
+        encoding="utf-8",
+    )
+    return output
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Genera adapters Cursor y Codex desde el repo de gestión."
@@ -130,9 +189,16 @@ def main(argv: list[str] | None = None) -> int:
         print(f"ERROR: CLAUDE.md.template no existe: {claude_md}", file=sys.stderr)
         return 1
 
+    target_cline = args.target / "cline"
+    target_continue = args.target / "continue"
+    target_windsurf = args.target / "windsurf"
+
     included, excluded = filter_cursor_rules(source_rules, target_cursor)
     context_mdc = generate_claude_md_context(claude_md, target_cursor)
     codex_template = generate_codex_agents_template(claude_md, target_codex)
+    cline_template = generate_cline_template(claude_md, target_cline)
+    continue_template = generate_continue_template(claude_md, target_continue)
+    windsurf_template = generate_windsurf_template(claude_md, target_windsurf)
 
     print(f"Reglas Cursor incluidas (description no vacía): {len(included)}")
     for name in included:
@@ -143,6 +209,9 @@ def main(argv: list[str] | None = None) -> int:
     print("\nGenerados:")
     print(f"  - {context_mdc.relative_to(args.target)}")
     print(f"  - {codex_template.relative_to(args.target)}")
+    print(f"  - {cline_template.relative_to(args.target)}")
+    print(f"  - {continue_template.relative_to(args.target)}")
+    print(f"  - {windsurf_template.relative_to(args.target)}")
     return 0
 
 

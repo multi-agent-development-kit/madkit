@@ -8,7 +8,7 @@ from __future__ import annotations
 from importlib.resources import files
 from pathlib import Path
 
-VALID_IDES = frozenset({"claude", "cursor", "codex"})
+VALID_IDES = frozenset({"claude", "cursor", "codex", "cline", "continue", "windsurf"})
 
 
 def templates_root_for(ide: str) -> Path:

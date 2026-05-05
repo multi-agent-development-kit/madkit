@@ -1,0 +1,176 @@
+# Continue project config
+# Auto-generado desde CLAUDE.md.template por madkit (T088).
+# Continue lee este archivo como configuración del proyecto.
+
+name: madkit-project
+version: 0.0.1
+schema: v1
+
+# Contexto del framework MAD inyectado como systemMessage
+systemMessage: |
+  # CLAUDE.md — Template base del proyecto
+  
+  > Este archivo se copia al raíz del proyecto destino por `madkit iniciar` (recomendado) o `/setup_project` (modo manual con análisis profundo de docs core), y se adapta por `/calibrate_templates`. Contiene guidance transversal para Claude Code: estilo de respuesta, asignación de modelo y delegación a subagentes.
+  >
+  > **Marcador `[...]`:** los bloques `[entre corchetes]` son placeholders a sustituir durante calibración con valores reales del proyecto.
+  
+  ---
+  
+  ## Proyecto
+  
+  - **Nombre:** [nombre del proyecto]
+  - **Stack:** [Python X.Y / TypeScript X.Y / PHP X.Y / Go / Rust / ADK / otro]
+  - **Framework:** [Django X.Y / Next.js X.Y / Laravel X.Y / FastAPI / google-adk / ...]
+  - **Base de datos:** [PostgreSQL X.Y / MySQL / SQLite / ...]
+  - **Gestor de paquetes:** [uv / pip / poetry / npm / pnpm / yarn / bun / composer]
+  
+  ---
+  
+  ## Estilo de respuesta
+  
+  Reglas operativas para toda interacción en este proyecto. Objetivo: respuestas precisas y compactas, sin cerimonia innecesaria.
+  
+  - **Frases declarativas.** Sin preámbulo, sin resumen final si la acción ya ocurrió.
+  - **No reformular la pregunta** antes de responder.
+  - **Anunciar tool calls en bloque**, no antes de cada llamada. Una frase antes de un grupo de acciones relacionadas es suficiente.
+  - **Bullets cuando la respuesta es enumerable.** Tablas solo si hay ≥3 filas y ≥2 columnas comparables.
+  - **No repetir** información que ya está en el diff o en el output del tool.
+  - **Comentarios en código:** solo cuando el *por qué* no es obvio (invariante oculto, workaround específico, comportamiento sorprendente). Nunca describir qué hace el código cuando el nombre ya lo dice.
+  
+  ---
+  
+  ## Estructura de carpetas (canónica en todos los proyectos)
+  
+  Esta estructura es **fija** en todos los proyectos del usuario. Los agents la asumen y la leen automáticamente — no hace falta repetirla por solicitud.
+  
+  ```
+  <proyecto>/
+  ├── ai_docs/
+  │   ├── core/          # Documentación viva (master_idea, architecture, data_models, decisions)
+  │   ├── tasks/         # Task docs numerados NNN_nombre.md (gitignored)
+  │   ├── refs/          # Referencias externas read-only (gitignored)
+  │   └── STATE.md       # (opcional, auto-generado) Breadcrumb del context-monitor hook cuando contexto ≤10%
+  ├── .claude/
+  │   ├── agents/        # 8 subagents desplegados (ver matriz abajo)
+  │   ├── commands/      # Slash commands (task_template_*, testing_setup, etc.)
+  │   ├── skills/        # Skills en folder/SKILL.md con kebab-case
+  │   └── hooks/         # (opcional) Hooks deployables — ver `claude-templates/hooks/README.md`
+  ├── CLAUDE.md          # Config del proyecto (este archivo)
+  └── src/ (o equivalente del stack: app/, packages/, wp-content/, etc.)
+  ```
+  
+  **Contratos que los agents asumen:**
+  - `task-planner` y `implementer` leen `ai_docs/core/*.md` en su Paso 0.
+  - `task-planner` y `/status` leen `ai_docs/STATE.md` si existe (breadcrumb tras contexto agotado).
+  - `doc-syncer` escribe SOLO en `ai_docs/core/` y `ai_docs/tasks/`.
+  - `researcher` puede leer todo pero no modifica nada.
+  - `git-guardian` NUNCA commitea `ai_docs/`, `.claude/`, `.cursor/` (scaffolding guard) y limpia `ai_docs/STATE.md` al cerrar el último commit del task referido.
+  - Task docs viven en `ai_docs/tasks/` — numeración global incremental, un solo archivo por número.
+  - Hooks en `.claude/hooks/` son opt-in (instalados por `setup_project` Fase 1.6); cada uno revisa `.claude/hooks/config.json` antes de activarse.
+  
+  Si la estructura difiere en un proyecto concreto (legacy, cliente impuso otra), declararlo aquí en la sección "Convenciones del proyecto" — los agents leerán la excepción.
+  
+  ---
+  
+  ## Modelo por perfil de trabajo
+  
+  Solo los **subagents** (`.claude/agents/*.md`) cambian de modelo de forma segura — cada subagent abre una sesión aislada con su propio contexto. Las **skills** heredan el modelo del invocador, excepto cuando declaran `context: fork` + `agent: <subagent>` — en ese caso la skill se ejecuta en el fork del subagent especificado (con su modelo, tools, effort).
+  
+  **Asignación de modelo en los 8 subagents (`.claude/agents/`):**
+  
+  | Agent | Modelo | Effort | Por qué |
+  |---|---|---|---|
+  | `task-planner` | opus | xhigh (default) | Planificación crítica: triaje, radio de impacto, corner cases, edge cases. Produce el task doc que guía toda la implementación. |
+  | `reviewer` | opus | xhigh (default) | Revisión correlacionada de 8 áreas en un pase. Perder correlaciones = iteración extra. |
+  | `adk` | opus | xhigh (default) | Arquitectura ADK, decisiones con coste alto de error (llamadas LLM, state keys, evalsets). |
+  | `implementer` | sonnet | high | Ejecuta planes ya triados. Skills pesadas (unit-testing, cleanup*) le delegan vía `context: fork`. |
+  | `doc-syncer` | sonnet | high | Sincroniza `ai_docs/core/` con el diff real. Memory: project — acumula patrones entre sesiones. |
+  | `researcher` | sonnet | xhigh | Análisis exhaustivo de dependencias y acoplamientos. Reemplaza el built-in Explore. Solo lectura. |
+  | `orientador` | sonnet | medium | Detecta el estado del proyecto y sugiere UN solo siguiente paso accionable. Para usuarios no técnicos: activa con "qué hago ahora", "estoy perdido", "ayuda". Tools read-only. |
+  | `git-guardian` | haiku | low | Orquesta skills mecánicas (commit, pr, diff, worktree). Sistema de "confianza baja no ejecuta" protege casos complejos. |
+  
+  **Cómo obtener el cambio de modelo donde importa:**
+  
+  - **Skills con `context: fork` + `agent: <subagent>`** (unit-testing, cleanup*, task-implementation-review) abren sesión aislada con el modelo del subagent elegido. Este es el patrón principal para ejecutar trabajo pesado fuera del hilo del usuario.
+  - **Skills sin `context: fork`** heredan el modelo del invocador (sesión del usuario o subagent que las llamó). Ejemplo: `git-guardian` (haiku) invoca `commit` → `commit` corre en haiku.
+  - **Skills invocadas directamente por el usuario** (p.ej. `/commit`) heredan el modelo de la sesión activa. Para ejecutarlas en un modelo distinto, invocar el subagent correspondiente.
+  
+  **Regla:** nunca bajar planificación ni revisión de opus por ahorrar tokens. Una iteración mal hecha cuesta más que cualquier ahorro.
+  
+  **Slash commands** (`.claude/commands/*.md`) heredan el modelo de la sesión activa — no soportan `model:` en frontmatter. Para planificación, abrir sesión en Opus antes de invocar `/create_task`, `/task_template_*` o similares.
+  
+  ---
+  
+  ## Cuándo delegar a subagentes
+  
+  Delegar a subagentes (Agent tool) **aísla contexto**: los logs, greps y lecturas de la investigación no contaminan la conversación padre, que recibe solo el resumen. Reduce consumo de tokens en conversaciones largas.
+  
+  ### Casos donde sí delegar
+  
+  | Caso | Subagent | Por qué |
+  |---|---|---|
+  | **Investigación exhaustiva previa al triaje** (>3 archivos probables, cambio con acoplamientos no triviales) | `researcher` (sonnet xhigh) | Mapea dependencias, callers, callees, contratos afectados en código real. Reemplaza al built-in Explore (descartado por falsos positivos). |
+  | **Consulta a refs externos** (`ai_docs/refs/`, documentación SDK) | `researcher` | Extrae fragmento canónico de volúmenes grandes sin cargarlos en el padre. |
+  | **Ejecución mecánica de un plan ya triado** | `implementer` (sonnet high) | Hace los cambios sin tomar decisiones de estrategia. Puede paralelizarse en N módulos disjuntos. |
+  | **Actualización de docs post-trabajo** | `doc-syncer` (sonnet high) | Correlaciona criterios de éxito con diff, actualiza `ai_docs/core/`, reporta gaps. |
+  | **Skills pesadas con `context: fork`** (unit-testing, cleanup*, task-implementation-review) | El subagent declarado en `agent:` | Sesión aislada con el modelo elegido. No contamina el hilo del usuario. |
+  
+  ### Casos donde explícitamente NO delegar
+  
+  - **Revisión de código correlacionada.** `reviewer` revisa 8 áreas en un pase. NO fragmentar en subagents paralelos por área — se pierden correlaciones cross-área (un smell puede implicar hueco de testing + inseguridad simultáneamente). Dividir por archivos sí; por áreas no.
+  - **Triaje de tarea.** El análisis de radio de impacto, atomicidad y corner cases es precisamente el trabajo del agente padre. Solo se delega la investigación previa que alimenta al triaje.
+  - **Bugfix.** Requiere razonamiento correlacionado con lo que el usuario está viendo. No va en `context: fork` — comparte contexto con la conversación padre.
+  - **Lectura de archivo único con objetivo claro.** Si sabes qué archivo leer y para qué, léelo directo.
+  
+  ### Paralelización
+  
+  Cuando `task-planner` detecta N módulos **independientes con archivos disjuntos** (p.ej. "actualiza auth, billing y notifications"), lanzar N `implementer` en paralelo (una sola respuesta con múltiples `Agent(...)`). Tras todos los cierres, un único `reviewer` correlacionado y finalmente `doc-syncer`.
+  
+  **NO paralelizar** si los módulos comparten archivos, dependencias transitivas o contratos.
+  
+  ### Agent Teams (experimental, manual)
+  
+  Para escenarios con hipótesis competidoras (bugfix CRÍTICO sin causa clara, decisión arquitectónica con 3+ alternativas legítimas), considerar Agent Teams:
+  
+  1. Activar con `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`.
+  2. Los teammates comparten task list, debaten entre sí, convergen en la respuesta.
+  3. Coste: cada teammate es una sesión Claude Code completa → mayor consumo de tokens.
+  
+  Los agents pueden **sugerir** Agent Teams al usuario, nunca activarlos automáticamente.
+  
+  ### Regla general
+  
+  > Delega lo que es investigación o ejecución mecánica cuyo detalle no se reutilizará literal. Mantén el criterio analítico (triaje, revisión correlacionada, decisiones arquitectónicas) en el agente padre.
+  
+  ---
+  
+  ## Prohibiciones del proyecto
+  
+  [Calibración rellena esta sección leyendo reglas "NUNCA" / "SIEMPRE" del proyecto.]
+  
+  - NUNCA [restricción 1]
+  - NUNCA [restricción 2]
+  - SIEMPRE [regla 1]
+  
+  ---
+  
+  ## Convenciones del proyecto
+  
+  [Calibración rellena con nombres, estructura, imports, formato de commits, etc.]
+  
+  - **Imports:** [absolutos/relativos]
+  - **Naming:** [snake_case/camelCase según stack]
+  - **Commits:** [conventional-commits / formato libre]
+  - **Branches:** [feat/fix/chore / main-only / ...]
+  
+  ---
+  
+  ## Comandos frecuentes
+  
+  [Calibración rellena con los comandos reales del stack detectado.]
+  
+  - **Tests:** `[pytest / npm test / ...]`
+  - **Lint:** `[ruff / eslint / ...]`
+  - **Type check:** `[mypy / tsc --noEmit / ...]`
+  - **Build:** `[...]`
+  - **Dev server:** `[...]`

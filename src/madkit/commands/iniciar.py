@@ -6,18 +6,26 @@ from pathlib import Path
 import typer
 
 from madkit.adapters.claude import ClaudeAdapter
+from madkit.adapters.cline import ClineAdapter
 from madkit.adapters.codex import CodexAdapter
+from madkit.adapters.continue_dev import ContinueAdapter
 from madkit.adapters.cursor import CursorAdapter
 from madkit.adapters.detector import detect_ide
+from madkit.adapters.windsurf import WindsurfAdapter
 from madkit.i18n import t
 
-VALID_IDE_OPTIONS = frozenset({"auto", "claude", "cursor", "codex", "all"})
+VALID_IDE_OPTIONS = frozenset(
+    {"auto", "claude", "cursor", "codex", "cline", "continue", "windsurf", "all"}
+)
 
 # IDEs implementados en esta versión.
 IMPLEMENTED_ADAPTERS = {
     "claude": ClaudeAdapter,
     "cursor": CursorAdapter,
     "codex": CodexAdapter,
+    "cline": ClineAdapter,
+    "continue": ContinueAdapter,
+    "windsurf": WindsurfAdapter,
 }
 
 # Subdirectorios de ai_docs/ creados por bootstrap
@@ -54,7 +62,7 @@ def run(
     # Resolver --ide=auto
     if ide == "auto":
         detected = detect_ide(project_path)
-        if detected in {"claude", "cursor", "codex"}:
+        if detected in IMPLEMENTED_ADAPTERS:
             ide = detected
         elif detected == "mixed":
             ide = "all"
@@ -71,7 +79,7 @@ def run(
     _ensure_ai_docs(project_path)
 
     # Desplegar adapter(s)
-    adapters_to_run: list[str] = ["claude", "cursor", "codex"] if ide == "all" else [ide]
+    adapters_to_run: list[str] = list(IMPLEMENTED_ADAPTERS.keys()) if ide == "all" else [ide]
 
     deployed_paths: list[Path] = []
     for adapter_key in adapters_to_run:

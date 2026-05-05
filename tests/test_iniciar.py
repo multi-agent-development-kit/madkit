@@ -50,9 +50,10 @@ def test_iniciar_force_overwrites(tmp_path: Path) -> None:
 
 
 def test_iniciar_invalid_ide_returns_error(tmp_path: Path) -> None:
-    result = runner.invoke(app, ["iniciar", str(tmp_path), "--ide", "windsurf"])
+    """`aider` no está soportado en esta versión — debe rechazar."""
+    result = runner.invoke(app, ["iniciar", str(tmp_path), "--ide", "aider"])
     assert result.exit_code == 1
-    assert "windsurf" in result.output
+    assert "aider" in result.output
 
 
 def test_iniciar_path_not_dir_returns_error(tmp_path: Path) -> None:
