@@ -6,7 +6,7 @@
 **Stack:** PHP / JavaScript / HTML / CSS / SQL
 **Complejidad Estimada:** [Simple / Estándar / Compleja / Crítica]
 
-> **Cabecera de Metadatos opcional (T079):** los task docs pueden incluir cabecera blockquote con `> **Depende de:**`, `> **Asunciones:**` y sub-sección "Wiring esperado" para el flujo `task-planner` Paso 0.6 (waves). Ver documentación completa en [`task_template.md`](task_template.md) §"Cabecera de Metadatos del Task Doc (opcional)" — esta plantilla hereda esa especificación.
+> **Cabecera de Metadatos opcional:** los task docs pueden incluir cabecera blockquote con `> **Depende de:**`, `> **Asunciones:**` y sub-sección "Wiring esperado" para el flujo `task-planner` Paso 0.6 (waves).
 
 ---
 
@@ -80,152 +80,22 @@
 
 ---
 
-<!-- SHARED-BLOCK: protocolo-creacion-v1 -->
-### Paso 0.1: Verificar Estructura del Proyecto
+### Pasos 0.1–0.7 — Gestión del documento de tarea
 
-Confirmar que la estructura de documentación requerida existe.
+**Delta PHP/Web:**
 
-- Verificar que el directorio `ai_docs/` existe
-- Verificar que el subdirectorio `ai_docs/tasks/` existe
-
-**Si no se encuentra:** DETENER y preguntar al usuario: "No veo un directorio `ai_docs/`. ¿Debería crearlo?"
+- **Paso 0.4 — Convención de nombres:** `XXX_camelCaseName.md` (camelCase web). Ubicación: `ai_docs/tasks/XXX_camelCaseName.md`.
+- **Paso 0.5 — Verificación rápida antes de presentar:** ¿El análisis exhaustivo de dependencias (sección 1, 4 pasos) reveló riesgos críticos (modificaciones al core, hooks con muchos callbacks)? Si sí → comunicar como observación.
+- **Paso 0.7 — Cabecera de seguimiento:** `Creado Por: task_template_php.md`.
 
 ---
 
-### Paso 0.2: Verificar Documento de Tarea Activa
-
-**Antes de crear una nueva tarea, verificar si ya existe una para este trabajo:**
-
-1. Listar archivos en `ai_docs/tasks/` y buscar un documento relacionado con la solicitud actual
-2. Si el usuario pide correcciones/revisiones de trabajo anterior → encontrar y ACTUALIZAR ese documento
-3. Si el usuario pide continuar implementación → encontrar y ACTUALIZAR ese documento
-4. **Solo crear un nuevo número de tarea si es trabajo genuinamente NUEVO sin documento existente**
-
-**Si se encuentra tarea activa:** Saltar al Paso 0.5 y trabajar sobre el documento existente.
-
----
-
-### Paso 0.3: Detectar Siguiente Número de Tarea
-
-**Solo si el Paso 0.2 confirmó que no aplica ninguna tarea existente:**
-
-1. Listar archivos en `ai_docs/tasks/`
-2. Extraer el prefijo de 3 dígitos de CADA nombre de archivo
-3. Encontrar el número más alto entre TODOS los archivos
-4. Sumar 1 y formatear con 3 dígitos
-5. Si no existen archivos: usar 001
-
-**Reglas:** Secuencia global compartida, siempre 3 dígitos, cada número se usa EXACTAMENTE UNA VEZ.
-- ❌ El número `000` está RESERVADO para calibración del proyecto — nunca usar para tareas normales
-
----
-
-### Paso 0.4: Crear Documento de Tarea
-
-**CRÍTICO: UNA tarea = UN archivo. UN número = UN archivo. Sin excepciones.**
-
-**Convención de Nombres para PHP/Web:**
-- **Formato:** `XXX_camelCaseName.md`
-- **Convención:** camelCase (PHP/Web)
-- **Ubicación:** `ai_docs/tasks/XXX_camelCaseName.md`
-- **Verificar:** NO exista un archivo con ese prefijo de número
-
----
-
-### Paso 0.5: Presentar Documento de Tarea al Usuario
-
-**NOTA:** El análisis crítico de impacto, prerequisitos y alcance ya se realizó en el Triaje de Ingeniería (Paso 0.0.6). Aquí se presenta el documento ya validado.
-
-**Verificación rápida antes de presentar:**
-- ¿El documento refleja el alcance validado en T3? Si no → actualizar.
-- ¿El análisis de dependencias reveló algo nuevo? Si sí → comunicar como observación.
-
-**Después de completar el triaje, presentar estas 3 opciones:**
-
-```
-Documento de Tarea Creado: `ai_docs/tasks/XXX_camelCaseName.md`
-
-**Resumen del Enfoque Planificado:**
-[Breve resumen de 2-3 oraciones]
-
-[Solo si se descubrió algo nuevo:]
-**Observaciones y Sugerencias del Asistente:**
-Tras analizar la tarea y el codebase, he identificado lo siguiente:
-
-1. **[Categoría]:** [Observación o sugerencia concreta]
-2. **[Categoría]:** [Observación o sugerencia concreta]
-3. **[Categoría]:** [Observación o sugerencia concreta — si aplica]
-
-> Categorías válidas: Dependencia detectada | Prerequisito | Alternativa de enfoque | Optimización | Riesgo identificado | Ajuste de alcance | Refactorización recomendada
-
-**¿Cómo deseas proceder?**
-
-**A) Vista Previa de Cambios de Código Detallados**
-**B) Aprobar e Iniciar Implementación**
-**C) Modificar o Iterar sobre el Plan**
-Ajustar el enfoque, explorar las sugerencias, o refinar el plan antes de comprometerse.
-```
-
-**PUNTO DE ESPERA OBLIGATORIO:** DETENERSE y esperar elección explícita del usuario.
-
-**NOTA SOBRE ITERACIÓN:** La iteración es el proceso normal. Las tareas raramente están perfectas en la primera versión. Si el usuario elige C, actualizar el documento existente, incorporar el feedback, y re-presentar con nuevas sugerencias basadas en la conversación.
-
----
-
-### Paso 0.6: Manejar Retroalimentación del Usuario
-
-**Si el usuario elige Opción C (Modificar) o solicita cambios:**
-- Actualizar el documento de tarea EXISTENTE — NO crear nuevos archivos
-- NO crear nuevas versiones (`_v2`, `_updated`, etc.)
-
----
-
-### Paso 0.7: Actualizaciones de Fase de Implementación
-
-**Cuando el usuario aprueba (Opción B) y la implementación comienza:**
-- Documentar progreso en el documento de tarea EXISTENTE agregando/actualizando una sección `## Progreso`
-- NO modificar plantillas en `.claude/commands/`
-
-#### Regla de Alcance Estricto (ACTIVA durante toda la implementación)
-
-> OBLIGATORIO: Solo modificar código directamente relacionado con la sección "Incluye".
-
-- Si se descubre un problema FUERA del alcance:
-  1. **NO arreglarlo** — documentarlo como nota en "Descubrimientos fuera de alcance" del task document
-  2. Si es BLOQUEANTE para la tarea actual: PAUSAR, informar al usuario, esperar decisión
-  3. Si NO es bloqueante: ignorarlo completamente
-- **Test rápido:** ¿Este cambio está en "Incluye"? → SI: proceder. NO: no tocarlo.
-- **Excepción única:** errores de sintaxis/compilación en líneas que YA se están modificando
-- **Prohibido:** arreglar warnings, code smells, o deuda técnica encontrada "de paso"
-
-**Convención de Nomenclatura:** `XXX_camelCaseName.md` (camelCase para proyectos web)
-
-**Agregar sección de seguimiento:**
-```markdown
-## Seguimiento del Ciclo de Vida de Tarea
-
-### Creación
-- **Creado:** [timestamp]
-- **Creado Por:** task_template_php.md
-- **Número de Tarea:** [XXX]
-- **Complejidad Inicial:** [Simple | Estándar | Compleja | Crítica]
-
-### Revisiones
-- [Fecha]: [Que cambio y por que]
-
-### Progreso de Implementación / Estado de Finalización
-- **Estado:** [Planificación | En Progreso | Pending Review | Completado | Bloqueado]
-- **Ultima Actualización:** [timestamp]
-```
-<!-- /SHARED-BLOCK -->
-
----
-
-## 0. Validación Pre-Vuelo (OBLIGATORIA)
+## 0. Validación Pre-Vuelo y Detección de Plataforma (OBLIGATORIA)
 
 Validar todos los prerequisitos antes de proceder. NO continuar si CUALQUIER validación falla.
 
-**Paso 0.0.1: Prerequisitos de Detección de Plataforma**
+### 0.0.1: Prerequisitos de Detección de Plataforma
+
 - Buscar archivos de firma de configuración:
   - WordPress: `wp-config.php`, `wp-content/`, `wp-includes/`
   - Magento: `app/etc/env.php`, `app/code/`, `pub/`
@@ -236,7 +106,8 @@ Validar todos los prerequisitos antes de proceder. NO continuar si CUALQUIER val
 - Extraer versión de plataforma de archivos de configuración
 - Detectar plugins/extensiones clave (WooCommerce, ACF, etc.)
 
-**Paso 0.0.2: Entorno PHP**
+### 0.0.2: Entorno PHP
+
 - PHP 8.2+ instalado y accesible (`php -v`)
 - Extensiones requeridas presentes: mysqli/pdo_mysql, curl, json, mbstring, gd, xml
 - Verificar compatibilidad PHP específica de la plataforma:
@@ -255,52 +126,140 @@ Validar todos los prerequisitos antes de proceder. NO continuar si CUALQUIER val
 - Nuevas funciones array: `array_find()`, `array_find_key()`, `array_any()`, `array_all()`
 - Class instantiation sin paréntesis: `new MyClass()->method()`
 
-**Paso 0.0.3: Convencion de Nomenclatura**
+### 0.0.3: Convencion de Nomenclatura
+
 - Confirmar que el proyecto web usa nomenclatura camelCase para archivos de tarea
 - Si no es una aplicacion web, redirigir a plantilla apropiada (task_template.md, task_template_python.md, task_template_adk.md)
 
-**Checklist Pre-Vuelo (TODOS deben pasar):**
+### 0.0.4: Detección Automática de Plataforma — Protocolo de 5 Pasos
+
+**OBJETIVO:** Identificar exactamente cual plataforma/CMS/framework esta en uso.
+
+**Paso 0.0.4.1: Detección de Archivos de Configuración**
+
+**Información Requerida:**
+- Verificar archivos de firma de plataforma:
+  - WordPress: `wp-config.php`, `wp-includes/version.php`
+  - Magento 2: `app/etc/env.php` / Magento 1: `app/Mage.php`
+  - PrestaShop: `config/config.inc.php` (buscar `_PS_VERSION_`)
+  - Drupal: `sites/default/settings.php`
+  - Joomla: `configuration.php`
+  - Laravel: archivo `artisan`, `composer.json` con laravel/framework
+  - Symfony: `bin/console`
+  - Fallback: `index.php` (PHP generico)
+
+**DOCUMENTAR:**
+- **Plataforma Detectada:** [WordPress / Magento 2 / PrestaShop / Drupal / Joomla / Laravel / Custom]
+- **Versión:** [extraida de archivos de configuración]
+- **Confianza:** Alta (multiples archivos) / Media (archivo único)
+
+**Paso 0.0.4.2: Detección de Estructura de Directorios**
+
+**Información Requerida:**
+- Listar directorios raiz
+- Verificaciones específicas por plataforma:
+  - WordPress: `wp-content/themes`, `wp-content/plugins`, `wp-content/uploads`
+  - Magento 2: `app/code`, `vendor/magento`, `pub/static`
+  - PrestaShop: `modules`, `themes`, `override`
+  - Custom/Otro: Todos los directorios 2 niveles de profundidad
+
+**DOCUMENTAR:**
+- **Estructura detectada:** [arbol de directorios principal]
+- **Directorios de personalizacion:** [themes/, modules/, plugins/, custom/, override/]
+- **Directorios de assets:** [css/, js/, images/, media/]
+
+**Paso 0.0.4.3: Detección de Base de Datos**
+
+**Información Requerida:**
+- Versión del motor DB (MySQL, MariaDB, PostgreSQL)
+- Extraer configuración de archivos específicos de plataforma (nombre DB, host, prefijo, charset)
+- Seguridad: NO mostrar contrasenas
+
+**DOCUMENTAR:**
+- **Motor DB:** [MySQL X.X / MariaDB X.X / PostgreSQL X.X]
+- **Nombre DB:** [database_name]
+- **Prefijo de tabla:** [wp_ / ps_ / m2_ / custom_]
+- **Charset:** [utf8mb4 / utf8 / latin1]
+
+**Paso 0.0.4.4: Detección de Servidor Web**
+
+**Información Requerida:**
+- Detectar servidor web en ejecucion (Apache o Nginx) y versión
+- Verificar configuración de reescritura de URL: `.htaccess` (Apache) o archivos conf de nginx
+
+**Paso 0.0.4.5: Generar Perfil de Plataforma**
+
+```markdown
+## PERFIL DE PLATAFORMA DETECTADO
+
+**Sistema:**
+- Plataforma: [WordPress 6.8 / Magento 2.4.8 / PrestaShop 9.0 / etc.]
+- Versión: [X.X.X]
+- Tipo de instalacion: [Estándar / Personalizado / Multi-sitio]
+
+**Stack Técnico:**
+- PHP: [X.X.X]
+- Base de Datos: [MySQL X.X / MariaDB X.X]
+- Servidor Web: [Apache X.X / Nginx X.X]
+- Gestores de Dependencias: [Composer, NPM]
+
+**Estructura:**
+- Raiz del proyecto: [/path/to/root]
+- Directorio de personalizacion: [wp-content/ / app/code/ / modules/]
+- Directorio de temas: [themes/]
+- Directorio de assets: [pub/static/ / assets/ / media/]
+
+**Base de Datos:**
+- Motor: [MySQL X.X]
+- Nombre: [database_name]
+- Prefijo: [prefix_]
+- Charset: [utf8mb4]
+- Total tablas: [cantidad]
+
+**Personalizaciones Detectadas:**
+- Plugins/modulos personalizados: [cantidad y lista]
+- Temas personalizados: [cantidad y lista]
+- Overrides: [cantidad y lista]
+- Modificaciones al core: [SI/NO - CRÍTICO si SI]
+
+**Estado del Sistema:**
+- Modo desarrollo: [Habilitado/Deshabilitado]
+- Cache: [Tipo y estado]
+- Modo producción: [SI/NO]
+```
+
+**CHECKLIST DE DETECCION (TODOS deben pasar):**
 - [ ] Archivos de firma de plataforma encontrados
 - [ ] Entorno PHP compatible
-- [ ] Plataforma confirmada o selección manual lista
-- [ ] Convencion de nomenclatura confirmada (camelCase)
+- [ ] Plataforma identificada y versión determinada
+- [ ] Base de datos identificada (motor, nombre, prefijo)
+- [ ] Servidor web detectado
+- [ ] Estructura de directorios mapeada
+- [ ] Convención de nomenclatura confirmada (camelCase)
 
-Si TODOS pasan: proceder al Paso 0 (Detección Automática de Plataforma).
+**REGLA:** Si CUALQUIER item de detección falla, DETENER. No proceder sin perfil de plataforma completo.
 
 ---
 
 ### 0.0.6 — Triaje de Ingeniería (OBLIGATORIO para ESTÁNDAR+)
 
-<!-- AI Agent: Para tareas SIMPLE (<=2 archivos), el triaje es mental. Para ESTÁNDAR+, es conversación explícita con el usuario. -->
+**Delta PHP/Web para T1 "Radio de impacto":**
 
-**T1: Analizar** — Examinar el codebase para responder:
+- Unidad de análisis: **archivos PHP, templates, hooks, filtros, tablas DB, módulos/plugins**.
+- Prerequisitos típicos: plataforma correcta detectada (Paso 0.0.4) · plugins/módulos activos · versión PHP compatible · permisos de archivo correctos.
+- Integración: hooks/filtros nativos disponibles · patrones de la plataforma establecidos · ¿hook nativo o código custom? · ¿plugin o `functions.php`? · ¿override o extensión?
+- Estado del codebase: modificaciones al core (CRÍTICO si SI), parches aplicados, deuda técnica histórica.
 
-- **Radio de impacto:** ¿Cuántos archivos PHP, templates, hooks, filtros, tablas se ven afectados?
-  - <=2 archivos en 1 módulo/plugin → SIMPLE
-  - 3-6 archivos en 1-2 módulos → ESTÁNDAR
-  - 6+ archivos o 3+ módulos/plugins → COMPLEJA
-  - Tablas >100K registros, datos producción, modificaciones al core → CRÍTICA
-- **Prerequisitos:** ¿Plataforma correcta? ¿Plugins/módulos necesarios activos? ¿Versión PHP compatible? Trazar dependencias (max 2 niveles). ✅ existe | ❌ falta.
-- **Integración:** ¿Hay hooks/filtros nativos que resuelven esto? ¿Patrones de la plataforma establecidos?
-- **Stack-specific:** ¿Hook nativo o solución custom? ¿Plugin o functions.php? ¿Override o extensión? Verificar antes de planificar.
+**Tabla de complejidad (común a todos los stacks, con ajuste PHP/Web):**
 
-**T2: Cuestionar (solo si hay razón):**
+| Radio | Complejidad |
+|---|---|
+| ≤2 archivos en 1 módulo/plugin | SIMPLE |
+| 3-6 archivos en 1-2 módulos | ESTÁNDAR |
+| 6+ archivos o 3+ módulos/plugins | COMPLEJA |
+| Tablas >100K registros / datos producción / modificaciones al core | CRÍTICA |
 
-- Alcance cubre 2+ funcionalidades independientes → proponer desglose
-- Existe hook/filtro nativo de la plataforma → proponerlo en lugar de código custom
-- Prerequisitos bloqueantes (plugins, versión PHP, permisos) → proponer resolverlos primero
-- Sobre-diseño detectado → proponer simplificación (KISS)
-
-**T3: Alinear** — Para ESTÁNDAR+, presentar al usuario:
-
-```
-Alcance: [1-2 frases]
-Complejidad: [nivel] — [N archivos, M módulos]
-Prerequisitos: [lista si hay] / Ninguno detectado
-¿Confirmas este alcance para crear el documento de tarea?
-```
-
-**PUNTO DE ESPERA:** Para ESTÁNDAR+, esperar confirmación antes de proceder.
+**Punto de espera T3:** SIMPLE → integrado con presentación final. ESTÁNDAR+ → punto de espera explícito antes de crear documento.
 
 ---
 
@@ -347,116 +306,6 @@ Prerequisitos: [lista si hay] / Ninguno detectado
 ```
 
 **REGLA CRÍTICA**: Por defecto enfoque brownfield. Los sistemas web legacy tienen alto riesgo de dependencias no documentadas.
-
----
-
-## 0. Detección Automática de Plataforma (OBLIGATORIA)
-
-### Protocolo de Detección de Plataforma en 5 Pasos
-
-**OBJETIVO:** Identificar exactamente cual plataforma/CMS/framework esta en uso.
-
-**Paso0.1: Detección de Archivos de Configuración**
-
-**Información Requerida:**
-- Verificar archivos de firma de plataforma:
-  - WordPress: `wp-config.php`, `wp-includes/version.php`
-  - Magento 2: `app/etc/env.php` / Magento 1: `app/Mage.php`
-  - PrestaShop: `config/config.inc.php` (buscar `_PS_VERSION_`)
-  - Drupal: `sites/default/settings.php`
-  - Joomla: `configuration.php`
-  - Laravel: archivo `artisan`, `composer.json` con laravel/framework
-  - Symfony: `bin/console`
-  - Fallback: `index.php` (PHP generico)
-
-**DOCUMENTAR:**
-- **Plataforma Detectada:** [WordPress / Magento 2 / PrestaShop / Drupal / Joomla / Laravel / Custom]
-- **Versión:** [extraida de archivos de configuración]
-- **Confianza:** Alta (multiples archivos) / Media (archivo único)
-
-**Paso0.2: Detección de Estructura de Directorios**
-
-**Información Requerida:**
-- Listar directorios raiz
-- Verificaciones específicas por plataforma:
-  - WordPress: `wp-content/themes`, `wp-content/plugins`, `wp-content/uploads`
-  - Magento 2: `app/code`, `vendor/magento`, `pub/static`
-  - PrestaShop: `modules`, `themes`, `override`
-  - Custom/Otro: Todos los directorios 2 niveles de profundidad
-
-**DOCUMENTAR:**
-- **Estructura detectada:** [arbol de directorios principal]
-- **Directorios de personalizacion:** [themes/, modules/, plugins/, custom/, override/]
-- **Directorios de assets:** [css/, js/, images/, media/]
-
-**Paso0.3: Detección de Base de Datos**
-
-**Información Requerida:**
-- Versión del motor DB (MySQL, MariaDB, PostgreSQL)
-- Extraer configuración de archivos específicos de plataforma (nombre DB, host, prefijo, charset)
-- Seguridad: NO mostrar contrasenas
-
-**DOCUMENTAR:**
-- **Motor DB:** [MySQL X.X / MariaDB X.X / PostgreSQL X.X]
-- **Nombre DB:** [database_name]
-- **Prefijo de tabla:** [wp_ / ps_ / m2_ / custom_]
-- **Charset:** [utf8mb4 / utf8 / latin1]
-
-**Paso0.4: Detección de Servidor Web**
-
-**Información Requerida:**
-- Detectar servidor web en ejecucion (Apache o Nginx) y versión
-- Verificar configuración de reescritura de URL: `.htaccess` (Apache) o archivos conf de nginx
-
-**Paso0.5: Generar Perfil de Plataforma**
-
-```markdown
-## PERFIL DE PLATAFORMA DETECTADO
-
-**Sistema:**
-- Plataforma: [WordPress 6.8 / Magento 2.4.8 / PrestaShop 9.0 / etc.]
-- Versión: [X.X.X]
-- Tipo de instalacion: [Estándar / Personalizado / Multi-sitio]
-
-**Stack Técnico:**
-- PHP: [X.X.X]
-- Base de Datos: [MySQL X.X / MariaDB X.X]
-- Servidor Web: [Apache X.X / Nginx X.X]
-- Gestores de Dependencias: [Composer, NPM]
-
-**Estructura:**
-- Raiz del proyecto: [/path/to/root]
-- Directorio de personalizacion: [wp-content/ / app/code/ / modules/]
-- Directorio de temas: [themes/]
-- Directorio de assets: [pub/static/ / assets/ / media/]
-
-**Base de Datos:**
-- Motor: [MySQL X.X]
-- Nombre: [database_name]
-- Prefijo: [prefix_]
-- Charset: [utf8mb4]
-- Total tablas: [cantidad]
-
-**Personalizaciones Detectadas:**
-- Plugins/modulos personalizados: [cantidad y lista]
-- Temas personalizados: [cantidad y lista]
-- Overrides: [cantidad y lista]
-- Modificaciones al core: [SI/NO - CRÍTICO si SI]
-
-**Estado del Sistema:**
-- Modo desarrollo: [Habilitado/Deshabilitado]
-- Cache: [Tipo y estado]
-- Modo producción: [SI/NO]
-```
-
-**CHECKLIST DE DETECCION (TODOS deben pasar):**
-- [ ] Plataforma identificada
-- [ ] Versión determinada
-- [ ] Base de datos identificada (motor, nombre, prefijo)
-- [ ] Servidor web detectado
-- [ ] Estructura de directorios mapeada
-
-**REGLA:** Si CUALQUIER item de detección falla, DETENER. No proceder sin perfil de plataforma completo.
 
 ---
 
@@ -550,7 +399,6 @@ grep -rn "registerHook\|Hook::exec" . --include="*.php" | grep -i "key_term"
 
 ---
 
-<!-- SHARED-BLOCK: alternativas-v1 -->
 ## 2. Análisis Estratégico y Alternativas de Solución
 
 **OBLIGATORIO para tareas ESTÁNDAR o superior. Para SIMPLE, documentar brevemente por que solo hay un enfoque viable.**
@@ -613,14 +461,23 @@ Realizar análisis completo si se cumplen 2+ criterios:
 
 **DECISIÓN DEL USUARIO REQUERIDA:**
 Presentar las alternativas al usuario con la recomendacion. Esperar aprobación antes de proceder.
-<!-- /SHARED-BLOCK -->
 
 ---
 
-<!-- SHARED-BLOCK: edge-cases-v1 -->
-## 2B. Análisis de Modos de Falla y Casos Extremos
+## 2B. Casos límite mínimos y modos de falla (obligatorio)
 
-**OBLIGATORIO para tareas ESTÁNDAR o superior. Para SIMPLE, omitir esta sección.**
+**OBLIGATORIO para todas las complejidades (SIMPLE, ESTÁNDAR, COMPLEJA, CRÍTICA).** La sección debe tener ≥3 entradas concretas con respuesta esperada. plan-checker D8 BLOQUEA si artifact ejecutable nuevo sin la sección o <3 entradas concretas.
+
+### Las 3 preguntas mínimas (responder concretamente)
+
+- **Input vacío / null / no existente:** ¿Qué pasa con `$_POST` vacío, meta keys ausentes, queries con `WP_Query` sin resultados?
+  **Respuesta esperada:** _[validación con `wp_unslash`, escape, fallback content]_
+- **Fallo de dependencia externa:** ¿Qué pasa si una API externa o plugin tercero falla, o BD lenta (>1s)?
+  **Respuesta esperada:** _[transient cache, fallback content, error log explícito]_
+- **Estado tras error parcial:** ¿Qué pasa si un hook en cadena falla a mitad? ¿Hay nonce / capability check / rollback?
+  **Respuesta esperada:** _[verify nonces, current_user_can, transactions cuando aplique]_
+
+Para preguntas adicionales por tipo de artifact, ver **`references/edge-cases-catalog.md`**.
 
 > Antes de disenar la implementación, analizar sistematicamente que puede salir mal. En ecosistemas PHP (WordPress, Magento, Laravel), los fallos mas comunes vienen de conflictos entre plugins/modulos, incompatibilidades de versión PHP y datos de usuario impredecibles.
 
@@ -637,11 +494,9 @@ Presentar las alternativas al usuario con la recomendacion. Esperar aprobación 
 
 ### Riesgos Aceptados (Bajo Impacto o Baja Probabilidad)
 - [Listar con justificación]
-<!-- /SHARED-BLOCK -->
 
 ---
 
-<!-- SHARED-BLOCK: rollback-v1 -->
 ## 2C. Estrategia de Rollback (OBLIGATORIO para COMPLEJA/CRÍTICA)
 
 Cada tarea COMPLEJA o CRÍTICA DEBE incluir un plan de rollback:
@@ -666,7 +521,6 @@ Cada tarea COMPLEJA o CRÍTICA DEBE incluir un plan de rollback:
 - **Tiempo estimado de rollback:** [Minutos/horas]
 - **Datos en riesgo:** [Qué datos podrían perderse]
 - **Verificación post-rollback:** [Cómo confirmar éxito]
-<!-- /SHARED-BLOCK -->
 
 ---
 
@@ -701,6 +555,20 @@ Cada tarea COMPLEJA o CRÍTICA DEBE incluir un plan de rollback:
 - [ ] Base de datos intacta: Todas las consultas funcionan, sin perdida de datos
 - [ ] Rendimiento no degradado: Tiempo de carga dentro de +10%
 - [ ] Backup completado y verificado antes de cambios
+
+### Criterios de Calidad de Ingeniería (canónicos)
+
+> **Obligatorio si la task toca código ejecutable** (.php/.js/archivos bajo `app/`, `src/`, `wp-content/themes/<tema>/`, `wp-content/plugins/<plugin>/`). Para tasks puramente documentales/config sin runtime, declarar excepción literal `Excepción a Criterios de Calidad de Ingeniería: task no toca código ejecutable (solo <docs/config>).` dentro del cuerpo de la sección "Riesgos aceptados", "Decisiones aceptadas" o "Riesgos y mitigaciones".
+
+- [ ] **Cleanup exhaustivo de comentarios:** archivos modificados sin comentarios narrativos del "qué hace el código", sin TODO/FIXME residual sin issue trackeado, sin código comentado. Verificable: `grep -nE "(TODO|FIXME|XXX)" <archivos>` retorna ≤ baseline previo + `phpcs` sin reportar `Generic.Commenting.Todo`/`Squiz.Commenting.PostStatementComment`. Comentarios permitidos solo cuando explican el WHY no obvio (constraint, invariant, workaround citado).
+
+- [ ] **Sin dead/legacy code:** sin clases/métodos/funciones/imports declarados y nunca referenciados, sin código inalcanzable tras return/throw, sin hooks/filters huérfanos, sin rutas registradas y no usadas. Verificable: `phpstan --level=5` o `psalm` sin nuevos hallazgos en archivos modificados; `grep -r "<símbolo nuevo>"` confirma ≥1 caller (excepto APIs públicas declaradas en docblock).
+
+- [ ] **DRY/KISS/early returns aplicados:** sin bloques de 3+ líneas duplicados entre Controllers/Services (extraer a Service/Action class o citar duplicación existente), sin abstracciones para 1 callsite, sin nesting innecesario donde un early return guard simplifica (validación temprana en controller). Verificable: revisión humana o `reviewer` agent §9, con verdict explícito por archivo modificado.
+
+- [ ] **TDD reutilizando infra existente:** todo código nuevo/modificado tiene test(s) escritos junto al código (no después), reutilizando `TestCase`/`Tests/` (Laravel/PHPUnit), factories existentes en `database/factories/`, o equivalente del proyecto. Verificable: archivo `Tests/Feature/<NombreTest>.php` existe con `extends TestCase` + kill-the-mutant pasa (comentar/invertir línea clave del cambio → al menos 1 test relevante falla). En L0 (sin PHPUnit), declarar como riesgo aceptado o invocar la skill `testing-setup` antes.
+
+**Defense-in-depth automático:** este bloque es validado por hook `task-doc-validator.js` + plan-checker D10 + reviewer §9 + task-implementation-review §10. El `task-planner` Paso 7.4 lo inyecta automáticamente.
 
 ---
 
@@ -860,83 +728,30 @@ Si CUALQUIER cosa sale mal durante el despliegue: ejecutar PLAN DE ROLLBACK inme
 
 ---
 
-<!-- SHARED-BLOCK: puerta-pre-impl-v1 -->
 ## PUERTA PRE-IMPLEMENTACIÓN (OBLIGATORIO)
 
-Antes de iniciar cualquier implementación, TODOS los checkboxes deben estar marcados:
-
-- [ ] Triaje de Ingeniería completado — alcance validado con usuario (ESTÁNDAR+)
-- [ ] Prerequisitos verificados — todos existen o tienen tarea separada
-- [ ] Complejidad clasificada (SIMPLE / ESTÁNDAR / COMPLEJA / CRÍTICA)
-- [ ] Pre-flight completado sin errores
-- [ ] Plataforma detectada y perfil generado
-- [ ] Análisis de dependencias completado (4 pasos)
-- [ ] Archivos afectados identificados
-- [ ] Alternativas evaluadas (ESTÁNDAR+)
-- [ ] Casos extremos analizados (ESTÁNDAR+)
-- [ ] Rollback documentado (COMPLEJA/CRÍTICA)
-- [ ] Criterios de éxito medibles definidos
-- [ ] Documento presentado y aprobado por usuario
-
-→ Si CUALQUIER checkbox sin marcar: DETENER. No implementar.
-<!-- /SHARED-BLOCK -->
+**Delta PHP/Web (añadir checkboxes):**
+- `[ ] Plataforma detectada y perfil generado` (Paso 0.0.4 — perfil completo).
+- `[ ] Análisis exhaustivo de dependencias completado (4 pasos: hooks, personalizaciones, mapa, riesgos)`.
 
 ---
 
-<!-- SHARED-BLOCK: instrucciones-agente-v3 -->
 ## Instrucciones para el Agente de IA
 
-**Rol: Ingeniero de Software Senior, no documentador.**
+Ver sección canónica en `task_template.md` §"Instrucciones canónicas para el Agente de IA". Deltas específicos de PHP:
 
-El asistente NO acepta la petición del usuario sin análisis. ANTES de crear cualquier documento de tarea, ejecutar el Triaje de Ingeniería (Paso 0.0.6): analizar impacto, trazar prerequisitos, evaluar alcance.
+- **Triaje plataforma:** mapear hooks WP/Magento/PrestaShop afectados antes de planificar; un hook con múltiples callers tiene radio de impacto multiplicado.
+- **Compatibilidad multi-versión:** verificar compatibilidad con PHP 7.4+/8.x según el target del proyecto; evitar sintaxis 8.x exclusiva sin fallback.
+- **Seguridad:** nonces, sanitización (`sanitize_text_field`, `esc_html`) y capabilities en todas las operaciones que muten datos.
 
-### Disciplina de Alcance (OBLIGATORIO)
+---
 
-> Complementa la "Regla de Alcance Estricto" del Paso 0.6 con principios de decisión.
+## Acciones Prohibidas y Documento Único
 
-- **Decisiones intencionales:** Asumir que código existente fuera del alcance refleja decisiones de negocio válidas. No sugerir cambios a código funcional que no está en el scope.
-- **Auto-remediación prohibida:** Nunca corregir problemas descubiertos durante review sin confirmación explícita del usuario. Reportar → esperar → actuar.
+---
 
-### Señales de Alerta (DETENER y comunicar al usuario)
+## Bloque `contract:` (opcional)
 
-- Petición que cubre 2+ funcionalidades independientes → proponer desglose en tareas separadas
-- Prerequisitos bloqueantes que son tareas en sí mismos → proponer crearlos primero
-- Existe solución más simple en el codebase o framework → proponerla
-- Radio de impacto sugiere complejidad diferente a la intuida → advertir y re-clasificar
-- Se pide crear complejidad innecesaria → proponer simplificación (KISS)
-
-### Flujo de Trabajo
-
-1. **Triaje** — Analizar impacto, prerequisitos, alcance (Paso 0.0.6 — T1/T2/T3)
-2. **Alinear** — Presentar alcance al usuario, esperar confirmación (ESTÁNDAR+)
-3. **Pre-flight** — Verificar entorno PHP (plataforma, versión, estructura)
-4. **Documentar** — Crear documento de tarea con alcance validado
-5. **Presentar** — Opciones A/B/C
-6. **Implementar** — Solo tras aprobación explícita (opción B)
-
-### Opciones de Implementación (presentar siempre)
-
-**A)** Vista Previa de Cambios de Código — fragmentos antes/después
-**B)** Proceder con Implementación — fase por fase
-**C)** Modificar o Iterar sobre el Plan — ajustar antes de comprometerse
-
-Esperar elección explícita. NUNCA asumir aprobación.
-
-### Durante Implementación
-
-Por cada fase completada:
-- Actualizar checkbox: `[x]` + timestamp + archivos modificados + resultado de verificación (lint/errores PHP/JS)
-- Si se descubre que el alcance era incorrecto → DETENER, comunicar, re-planificar
-- Esperar "proceder" antes de siguiente fase
-
-Tras todas las fases: cambiar estado a `Pending Review` → ejecutar checklist de revisión → si APROBADO cambiar a `Completado`.
-
-### Aprobación Explícita
-
-**APROBADO**: "ejecuta", "adelante", "aprobado", "proceder", "se ve bien"
-**NO APROBADO**: "interesante", "ya veo", preguntas sobre el plan, silencio
-**AMBIGUO**: "ok", "vale", "claro" → confirmar antes de proceder
-<!-- /SHARED-BLOCK -->
 
 ---
 

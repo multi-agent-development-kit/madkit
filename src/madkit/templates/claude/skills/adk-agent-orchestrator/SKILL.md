@@ -1,6 +1,7 @@
 ---
 name: adk-agent-orchestrator
-description: "Sincronización de arquitectura ADK con documentos de diseño. Activar proactivamente al modificar agent.py, sub_agents/, tools en proyectos ADK. Para diseñar desde cero → adk-workflow-design. Skill del agente adk."
+description: "[ADK] En proyectos Google ADK (google-adk SDK): sincronización de arquitectura con documentos de diseño. Activar al modificar agent.py, sub_agents/, tools en proyectos ADK. Para diseñar desde cero → adk-workflow-design."
+paths: ["**/agent.py", "**/agents/**", "**/adk/**/*.py", "**/pyproject.toml"]
 ---
 
 ## Activación
@@ -26,7 +27,7 @@ Este skill se activa cuando se detectan cambios en CUALQUIER aspecto de la arqui
 
 Buscar en `ai_docs/tasks/` un documento que coincida con el workflow actual:
 - Buscar archivos con prefijo `DESIGN_` relacionados con el sistema de agentes modificado
-- Si no existe documento de diseño: **ADVERTIR** al usuario y sugerir crear uno con `/adk_orchestrator_template`
+- Si no existe documento de diseño: **ADVERTIR** al usuario y sugerir crear uno con el command `/adk_orchestrator_template`
 
 ### Paso 2: Analizar Cambio vs Documento
 
@@ -107,25 +108,11 @@ Reportar inmediatamente al usuario si se detecta:
 - **Evalsets desactualizados**: Tests que no cubren agentes nuevos o modificados
 - **State keys sin convención**: Keys que no siguen el formato `{agente}_{tipo}` documentado
 
-> Para referencia de patrones y arquitecturas: `ai_docs/refs/adk-samples/`
+> Para referencia de patrones y arquitecturas: `ai_docs/refs/adk-samples/` si disponible en el proyecto, o documentación oficial ADK
 > Checklist maestro de validación en subagent `adk` § Protocolo de Validación Técnica
 
 ---
 
 ## Formato de Reporte
 
-Al completar la sincronización, presentar:
-
-```
-Sincronización de Arquitectura ADK
-
-Cambio detectado: [descripción breve]
-Impacto: [menor | significativo | estructural]
-Documento actualizado: ai_docs/tasks/XXX_DESIGN_WORKFLOW_NAME.md
-
-Cambios en documento:
-- [sección actualizada]: [qué cambió]
-
-Validación post-cambio: [N/6 checks passed]
-Alertas: [lista de alertas, si las hay]
-```
+Al completar la sincronización, presentar en una sola sección: cambio detectado, nivel de impacto, documento actualizado, secciones modificadas, resultado del checklist de 6 puntos y alertas activas (si las hay).

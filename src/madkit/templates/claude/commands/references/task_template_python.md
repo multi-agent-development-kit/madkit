@@ -2,7 +2,7 @@
 
 > **Instrucciones:** Esta plantilla crea documentos de tareas del tamaño apropiado para desarrollo Python con IA. **Lee PRIMERO la clasificacion de complejidad a continuacion** para evitar documentos innecesariamente verbosos.
 >
-> **Cabecera de Metadatos opcional (T079):** los task docs pueden incluir cabecera blockquote con `> **Depende de:**`, `> **Asunciones:**` y sub-sección "Wiring esperado" para el flujo `task-planner` Paso 0.6 (waves). Ver documentación completa en [`task_template.md`](task_template.md) §"Cabecera de Metadatos del Task Doc (opcional)" — esta plantilla hereda esa especificación.
+> **Cabecera de Metadatos opcional:** los task docs pueden incluir cabecera blockquote con `> **Depende de:**`, `> **Asunciones:**` y sub-sección "Wiring esperado" para el flujo `task-planner` Paso 0.6 (waves).
 
 ---
 
@@ -83,59 +83,23 @@
 
 ## 0. Triaje de Ingeniería (OBLIGATORIO ANTES de crear documento)
 
-<!-- AI Agent: Esta fase se ejecuta ANTES de crear el documento de tarea. Para tareas SIMPLE (<=2 archivos), el triaje es mental. Para ESTÁNDAR+, es explícito y se comunica al usuario. -->
+**T1 — Radio de impacto (delta Python):**
 
-**DETENER. No crear documento de tarea sin completar este triaje.**
+- Unidad de análisis: **servicios, repositorios, modelos, endpoints, archivos de configuración**.
+- Prerequisitos típicos: entorno virtual activo, dependencias instaladas, framework configurado, servicios necesarios.
+- Integración: patrones de servicios/repositorios establecidos · ¿extender vs nuevo servicio? · sync vs async.
+- Estado del codebase: deuda técnica, errores `mypy`, conflictos de dependencias.
 
-### T1: Analizar — Examinar el codebase ANTES de planificar
+**Tabla de complejidad (común a todos los stacks):**
 
-Antes de documentar nada, examinar el proyecto para responder:
+| Radio | Complejidad |
+|---|---|
+| ≤2 archivos en 1 módulo | SIMPLE |
+| 3-6 archivos en 1-2 módulos | ESTÁNDAR |
+| 6+ archivos o 3+ módulos | COMPLEJA |
+| Sistemas externos / datos producción / prerequisitos bloqueantes | CRÍTICA |
 
-**Radio de impacto:**
-- ¿Cuántos servicios, repositorios, modelos, endpoints y archivos de configuración se ven afectados?
-- Esto determina la complejidad REAL (no la intuida por la descripción del usuario)
-
-**Prerequisitos:**
-- ¿Qué debe existir para que esto funcione? Trazar dependencias hacia atrás (max 2 niveles)
-- Marcar cada prerequisito: ✅ existe | ❌ falta (bloqueante)
-- Verificar: entorno virtual, dependencias, framework configurado, servicios necesarios
-- Si hay prerequisitos bloqueantes → son tareas separadas que deben resolverse primero
-
-**Integración:**
-- ¿Cómo se conecta con lo existente? ¿Hay patrones de servicios/repositorios establecidos?
-- ¿Nuevo servicio o extender existente? ¿Hay código reutilizable?
-
-**Estado del codebase:**
-- ¿Hay deuda técnica, errores mypy, o conflictos de dependencias que afecten?
-
-### T2: Cuestionar — Solo si el análisis revela algo relevante
-
-El agente NO cuestiona por cuota. Cuestiona cuando T1 revela algo que el usuario no ha considerado:
-
-- **Alcance excesivo:** La petición cubre 2+ funcionalidades independientes → proponer desglose en tareas separadas con dependencias claras
-- **Enfoque subóptimo:** Existe una solución más simple en el codebase o el framework → proponerla (ej: ¿nuevo servicio o extender existente? ¿sync o async?)
-- **Prerequisitos bloqueantes:** Falta infraestructura o código que son tareas en sí mismos → proponer crearlos primero
-- **Viabilidad técnica:** El enfoque pedido tiene problemas técnicos concretos → advertir y proponer alternativa
-- **Sobre-diseño:** Se está creando complejidad innecesaria para el caso de uso real → proponer simplificación KISS
-
-**Si no hay nada que cuestionar:** Pasar directo a T3. No fabricar objeciones.
-
-### T3: Alinear — Validar alcance con el usuario antes de documentar
-
-Presentar al usuario un resumen del alcance antes de crear el documento:
-
-```
-Alcance: [1-2 frases de qué se va a hacer]
-Complejidad: [SIMPLE|ESTÁNDAR|COMPLEJA|CRÍTICA] — basada en ~N archivos, M módulos
-Prerequisitos: [lista si hay] / Ninguno detectado
-[Solo si hubo negociación en T2] Fuera de alcance: [qué queda fuera y por qué]
-[Solo si T2 detectó algo] Observación: [hallazgo relevante]
-
-¿Confirmas para crear el documento de tarea?
-```
-
-**Para tareas SIMPLE:** T3 se integra con la presentación final — no hay dos puntos de espera.
-**Para ESTÁNDAR+:** T3 es un punto de espera explícito antes de crear el documento.
+**Punto de espera T3:** Para SIMPLE, T3 se integra con la presentación final (un solo punto de espera). Para ESTÁNDAR+, T3 es un punto de espera explícito antes de crear el documento.
 
 ---
 
@@ -148,8 +112,8 @@ DETENER. NO proceder si CUALQUIER validación falla. Resolver TODOS los fallos a
 ### 0.1.1 Acceso al Sistema de Archivos
 
 - [ ] Directorio de trabajo actual es accesible con permisos de lectura/escritura
-- [ ] El directorio `ai_docs/` existe (o anotar para creación en Paso 0.7)
-- [ ] El directorio `ai_docs/tasks/` existe (o anotar para creación en Paso 0.7)
+- [ ] El directorio `ai_docs/` existe (o anotar para creación en Paso 0.1)
+- [ ] El directorio `ai_docs/tasks/` existe (o anotar para creación en Paso 0.1)
 
 ---
 
@@ -219,138 +183,36 @@ DETENER. NO proceder si CUALQUIER validación falla. Resolver TODOS los fallos a
 - [ ] Convencion de nomenclatura: `XXX_snake_case_name.md` (estandar Python PEP 8)
 - [ ] Tareas existentes en `ai_docs/tasks/` siguen este patrón
 
-NOTA: Si el proyecto no es Python, usar la plantilla apropiada (task_template.md para TypeScript, task_template_php.md para PHP, task_template_adk.md para ADK).
+NOTA: Si el proyecto no es Python, usar la plantilla apropiada (task_template_typescript.md para TypeScript, task_template_php.md para PHP, task_template_adk.md para ADK).
 
 ---
 
 ### Validación Pre-Vuelo Completa
 
-Todas las verificaciones pasan: Proceder al Paso 0.8 (Verificar Estructura del Proyecto).
+Todas las verificaciones pasan: Proceder a los Pasos 0.1–0.5 (Gestión del documento de tarea).
 
 ---
 
-### Paso 0.8: Verificar Estructura del Proyecto
+### Pasos 0.1–0.5 — Gestión del documento de tarea
 
-Confirmar que los directorios `ai_docs/` y `ai_docs/tasks/` existen.
+**Delta Python:**
 
-**Si no se encuentran:** DETENER y preguntar al usuario: "No veo un directorio `ai_docs/`. Debo crearlo?"
-
----
-
-### Paso 0.9: Verificar Documento de Tarea Activa
-
-Antes de crear una nueva tarea:
-
-1. Listar archivos en `ai_docs/tasks/` y buscar un documento relacionado con la solicitud actual
-2. Si el usuario pide correcciones/revisiones/continuacion -- buscar y ACTUALIZAR el documento existente
-3. **Solo crear un nuevo número de tarea si es trabajo GENUINAMENTE NUEVO**
-
-Si se encuentra tarea activa: Saltar al Paso 0.12 (Manejar Retroalimentacion) y trabajar sobre el documento existente.
+- **Paso 0.4 — Convención de nombres:** `XXX_snake_case_name.md` (PEP 8). Ubicación: `ai_docs/tasks/XXX_snake_case_name.md`.
+- **Paso 0.5 — Cabecera de seguimiento:** `Creado Por: task_template_python.md`. Las "Observaciones y Sugerencias del Asistente" listan categorías Python típicas (Dependencia detectada, Prerequisito, Alternativa de enfoque, Optimización, Riesgo identificado, Ajuste de alcance, Refactorización recomendada).
+- **Paso 0.5b (Retroalimentación):** editar archivo EXISTENTE in-place; agregar notas de revisión con timestamps en secciones relevantes.
 
 ---
 
-### Paso 0.10: Detectar Siguiente Número de Tarea
+## Acciones Prohibidas y Documento Único
 
-**Solo si el Paso 0.9 confirmo que no aplica ninguna tarea existente:**
+**Delta Python:**
 
-1. Listar archivos en `ai_docs/tasks/`
-2. Extraer el prefijo de 3 dígitos de cada nombre de archivo
-3. Encontrar el número mas alto, sumar 1, formatear con 3 dígitos
-4. Si no hay archivos: usar 001
-
-**Reglas:**
-- Secuencia global compartida (nunca reiniciar por tipo)
-- Siempre 3 dígitos: 001, 042, 156
-- Cada número usado EXACTAMENTE UNA VEZ -- un número, un archivo
-
----
-
-### Paso 0.11: Crear Documento de Tarea
-
-CRÍTICO: UNA tarea = UN archivo. UN número = UN archivo.
-
-**Nomenclatura:** `ai_docs/tasks/XXX_snake_case_name.md`
-
-**Estructura:**
-1. Llenar secciones basadas en clasificacion de complejidad (SIMPLE/ESTÁNDAR/COMPLEJO)
-2. Incluir análisis estrategico si los criterios de complejidad se cumplen
-3. Proveer fases de implementación con ejemplos antes/despues
-4. Definir criterios de éxito claros
-
----
-
-### Paso 0.12: Presentar Documento de Tarea al Usuario
-
-<!-- El análisis crítico (dependencias, prerequisitos, viabilidad, alternativas) ya se realizó en el Triaje de Ingeniería (T1-T2-T3). Este paso presenta el documento ya validado. -->
-
-Presentar estas 3 opciones:
-
-```
-Documento de Tarea Creado: `ai_docs/tasks/XXX_snake_case_name.md`
-
-Resumen del Enfoque Planificado:
-[Resumen breve de 2-3 oraciones]
-
-Observaciones y Sugerencias del Asistente:
-Tras analizar la tarea y el codebase, he identificado lo siguiente:
-
-1. **[Categoría]:** [Observación o sugerencia concreta]
-2. **[Categoría]:** [Observación o sugerencia concreta]
-3. **[Categoría]:** [Observación o sugerencia concreta — si aplica]
-
-> Categorías válidas: Dependencia detectada | Prerequisito | Alternativa de enfoque | Optimización | Riesgo identificado | Ajuste de alcance | Refactorización recomendada
-
-Como deseas proceder?
-
-A) Vista Previa de Cambios de Codigo Detallados
-Mostrar ejemplos específicos antes/despues y modificaciones de archivos.
-
-B) Aprobar e Iniciar Implementación
-Comenzar implementación fase por fase con seguimiento de progreso.
-
-C) Modificar o Iterar sobre el Plan
-Ajustar el enfoque, explorar las sugerencias, o refinar el plan antes de comprometerse.
-```
-
-PUNTO DE ESPERA OBLIGATORIO:
-- DETENER aqui y esperar eleccion explicita del usuario (A, B o C)
-- NO asumir aprobación ni elegir opcion por defecto
-- NO iniciar implementación sin respuesta explicita "B" o "Aprobado"
-
-**NOTA SOBRE ITERACIÓN:** La iteración es el proceso normal. Las tareas raramente están perfectas en la primera versión. Si el usuario elige C, actualizar el documento existente, incorporar el feedback, y re-presentar con nuevas sugerencias basadas en la conversación.
-
----
-
-### Paso 0.12b: Manejar Retroalimentacion y Actualizaciones del Usuario
-
-Si el usuario elige Opcion C o solicita cambios:
-
-- Leer documento de tarea actual e identificar secciones que necesitan modificacion
-- Editar el archivo EXISTENTE in-place -- NUNCA crear variantes `_v2`, `_updated`, `_revised`
-- Agregar notas de revisión con timestamps en secciones relevantes
-
----
-
-## ACCIONES PROHIBIDAS
-
-### NO HACER:
-1. Modificar archivos de plantilla en `.claude/commands/`
-2. Crear multiples versiones de documentos de tarea (`_v2`, `_updated`, `_final`)
-3. Crear nuevas carpetas ai_docs en subdirectorios o ubicaciones diferentes
-4. Saltar secuencia de números de tarea o reiniciar numeracion
-5. Crear archivos de resumen/reporte separados del documento de tarea
-6. Crear multiples archivos con el mismo número de tarea
-7. Implementar sin aprobación -- siempre esperar eleccion explicita del usuario
-8. Asumir la estructura del proyecto -- siempre verificar que los directorios existen primero
-
-### REGLA DE DOCUMENTO UNICO (ABSOLUTA):
-- UN número de tarea = UN archivo. Punto.
-- Correcciones, progreso de implementación, revisiones, sub-reportes -- todo va en el MISMO archivo
-
-### CONDICIONES DE PARADA DE EMERGENCIA:
-- A punto de modificar un archivo de plantilla -- DETENER y advertir al usuario
-- A punto de crear `ai_docs_v2/` o similar -- DETENER y usar `ai_docs/` existente
-- A punto de crear un segundo archivo con un número de tarea existente -- DETENER y editar archivo existente
+- Añadir prohibición específica: `NO modificar archivos de plantilla en .claude/commands/`.
+- Añadir prohibición específica: `NO crear nuevas carpetas ai_docs en subdirectorios o ubicaciones diferentes` (usar siempre `ai_docs/` raíz existente).
+- **Condiciones de parada de emergencia (Python):**
+  - A punto de modificar un archivo de plantilla → DETENER y advertir al usuario.
+  - A punto de crear `ai_docs_v2/` o similar → DETENER y usar `ai_docs/` existente.
+  - A punto de crear un segundo archivo con un número de tarea existente → DETENER y editar archivo existente.
 
 ---
 
@@ -840,9 +702,7 @@ uv run pytest
    - 0 `# type: ignore` sin justificación en código nuevo/modificado
    - Encadenamiento de excepciones: `raise X from e`
 4. **Code smells** — Buscar EN ARCHIVOS MODIFICADOS: TODO/FIXME, print(), código comentado, imports no usados. Reportar hallazgos; NO eliminar sin confirmación del usuario.
-5. **DRY** — En archivos modificados, verificar que no se duplica lógica ya existente en el codebase. Si se encuentra duplicación → reportar al usuario con propuesta de extracción; NO extraer automáticamente.
-6. **KISS** — ¿Es la implementación más simple que satisface los criterios? Abstracciones prematuras y sobre-ingeniería son defectos, no mejoras.
-7. **Separación de responsabilidades** — Rutas/views: solo orquestación. Lógica de negocio: en services. Acceso a datos: en repositories. Validación: Pydantic para datos externos.
+5. **DRY/KISS/SoC: responsabilidad del `reviewer` agent §2/§3/§5 post-impl.** El implementer respeta P2 (minimum code) + P3 (touch only what you must) sin aplicar refactor proactivo. Rutas/views, lógica de negocio (services), acceso a datos (repositories) y validación (Pydantic) siguen las convenciones del proyecto — el reviewer correlacionado verifica adherencia post-impl.
 8. **Integración** — Verificar imports de módulos modificados, referencia cruzada con pyproject.toml (cada import tiene su dependencia declarada), sin dependencias faltantes ni circulares.
 9. **Regresión** — Ejecutar tests de módulos afectados por el cambio (`uv run pytest tests/módulo`). Suite completa solo si el cambio afecta dependencias compartidas. Si no hay tests para el código modificado → documentar como riesgo.
 10. **Seguridad** (si aplica) — Validación de inputs, sin secretos hardcoded, permisos verificados, sin SQL raw sin parametrizar.
@@ -855,10 +715,20 @@ uv run pytest
 
 ---
 
-<!-- SHARED-BLOCK: edge-cases-v1 -->
-## 12. Análisis de Modos de Falla y Casos Extremos
+## 12. Casos límite mínimos y modos de falla (obligatorio)
 
-**OBLIGATORIO para tareas ESTÁNDAR o superior. Para SIMPLE, omitir esta sección.**
+**OBLIGATORIO para todas las complejidades (SIMPLE, ESTÁNDAR, COMPLEJA, CRÍTICA).** La sección debe tener ≥3 entradas concretas con respuesta esperada. plan-checker D8 BLOQUEA si artifact ejecutable nuevo sin la sección o <3 entradas concretas.
+
+### Las 3 preguntas mínimas (responder concretamente)
+
+- **Input vacío / null / no existente:** ¿Qué pasa con `None`, strings vacíos, listas/dicts vacíos, o archivos inexistentes?
+  **Respuesta esperada:** _[describir comportamiento concreto]_
+- **Fallo de dependencia externa:** ¿Qué pasa si BD/API/servicio falla con timeout, 500, o respuesta malformada?
+  **Respuesta esperada:** _[degradación o error tipado]_
+- **Estado tras error parcial:** ¿Qué pasa si una operación multi-paso falla a mitad? ¿Hay rollback / idempotencia?
+  **Respuesta esperada:** _[recovery: transacción, retry, compensación]_
+
+Para preguntas adicionales por tipo de artifact, ver **`references/edge-cases-catalog.md`**.
 
 > Analizar sistematicamente que puede salir mal ANTES de implementar. Los edge cases descubiertos aqui deben informar el diseño, no solo validarse en testing.
 
@@ -888,11 +758,8 @@ uv run pytest
 ### Riesgos Aceptados (Bajo Impacto o Baja Probabilidad)
 - [Listar con justificacion de por que se acepta el riesgo]
 
-<!-- /SHARED-BLOCK -->
-
 ---
 
-<!-- SHARED-BLOCK: rollback-v1 -->
 ## 12B. Estrategia de Rollback (OBLIGATORIO para COMPLEJA/CRÍTICA)
 
 Cada tarea COMPLEJA o CRÍTICA DEBE incluir un plan de rollback:
@@ -921,7 +788,6 @@ Cada tarea COMPLEJA o CRÍTICA DEBE incluir un plan de rollback:
 - **Tiempo estimado de rollback:** [Minutos/horas]
 - **Datos en riesgo:** [Que datos podrian perderse]
 - **Procedimiento de verificación post-rollback:** [Como confirmar que el rollback fue exitoso]
-<!-- /SHARED-BLOCK -->
 
 ---
 
@@ -961,103 +827,21 @@ Cada tarea COMPLEJA o CRÍTICA DEBE incluir un plan de rollback:
 
 ---
 
-<!-- SHARED-BLOCK: puerta-pre-impl-v1 -->
 ## PUERTA PRE-IMPLEMENTACIÓN (OBLIGATORIO)
 
-Antes de iniciar cualquier implementación, TODOS los checkboxes deben estar marcados:
-
-- [ ] Triaje de Ingeniería completado — alcance validado con usuario (ESTÁNDAR+)
-- [ ] Prerequisitos verificados — todos existen o tienen tarea separada
-- [ ] Complejidad clasificada (SIMPLE / ESTÁNDAR / COMPLEJA / CRÍTICA)
-- [ ] Pre-flight completado sin errores
-- [ ] Archivos afectados identificados
-- [ ] Alternativas evaluadas (ESTÁNDAR+)
-- [ ] Casos extremos analizados (ESTÁNDAR+)
-- [ ] Rollback documentado (COMPLEJA/CRÍTICA)
-- [ ] Criterios de éxito medibles definidos
-- [ ] Documento presentado y aprobado por usuario
-
-Si CUALQUIER checkbox sin marcar: DETENER. No implementar.
-<!-- /SHARED-BLOCK -->
-
 ---
 
-<!-- SHARED-BLOCK: instrucciones-agente-v3 -->
 ## Instrucciones para el Agente de IA
 
-**Rol: Ingeniero de Software Senior, no documentador.**
+Ver sección canónica en `task_template.md` §"Instrucciones canónicas para el Agente de IA". Deltas específicos de Python:
 
-El asistente NO acepta la peticion del usuario sin analisis. ANTES de crear cualquier documento de tarea, ejecuta el Triaje de Ingenieria (T1-T2-T3).
+- **Triaje:** analizar dependencias entre servicios (`services/`, `models/`); trazar cascada de imports antes de planificar.
+- **Pre-flight:** validar entorno virtual activo (`ruff check .` + `mypy .` base limpia antes de tocar código).
+- **Checklist de revisión Python:** lint con `ruff` + tipos con `mypy`; verificar idioms PEP-8 en archivos modificados.
+- **Versiones de dependencias:** antes de agregar deps AI/ML (google-genai, openai, langchain), verificar última versión estable publicada. No usar versiones hardcodeadas sin verificar.
 
-**SIEMPRE:** Examinar el codebase antes de planificar. Trazar prerequisitos y dependencias. Cuestionar el enfoque cuando el analisis lo justifique. Proponer la solucion mas simple que resuelva el problema (KISS).
+## Bloque `contract:` (opcional)
 
-**NUNCA:** Documentar pasivamente lo que el usuario pide sin analizar. Fabricar objeciones sin razon tecnica. Sobre-disenar soluciones. Omitir prerequisitos bloqueantes.
-
-### Disciplina de Alcance (OBLIGATORIO)
-
-> Complementa la "Regla de Alcance Estricto" del Paso 0.6 con principios de decisión.
-
-- **Decisiones intencionales:** Asumir que código existente fuera del alcance refleja decisiones de negocio válidas. No sugerir cambios a código funcional que no está en el scope.
-- **Auto-remediación prohibida:** Nunca corregir problemas descubiertos durante review sin confirmación explícita del usuario. Reportar → esperar → actuar.
-
-### Senales de Alerta (DETENER y comunicar al usuario)
-
-- Peticion que cubre 2+ funcionalidades independientes - proponer desglose
-- Prerequisitos bloqueantes que son tareas en si mismos - proponer crearlos primero
-- El usuario pide la solucion X, pero el problema se resuelve mejor con Y - proponer Y
-- Radio de impacto real difiere significativamente del intuido - re-clasificar complejidad
-- Sobre-diseno detectado - proponer simplificacion
-
-### Flujo de Trabajo
-
-1. **Triaje** - Analizar impacto, prerequisitos, viabilidad (T1-T2-T3)
-2. **Alinear** - Presentar alcance al usuario, obtener confirmacion
-3. **Pre-flight** - Validar entorno Python (entorno, framework, deps)
-4. **Documentar** - Crear documento de tarea con alcance validado
-5. **Presentar** - Opciones A/B/C
-6. **Implementar** - Solo tras aprobacion explicita, fase por fase
-
-### Opciones de Implementacion (presentar siempre)
-
-**A)** Vista Previa de Cambios de Codigo - fragmentos antes/despues
-**B)** Proceder con Implementacion - fase por fase
-**C)** Modificar o Iterar sobre el Plan - ajustar antes de comprometerse
-
-Esperar eleccion explicita. NUNCA asumir aprobacion.
-
-#### Regla de Alcance Estricto (ACTIVA durante toda la implementación)
-
-> OBLIGATORIO: Solo modificar código directamente relacionado con la sección "Incluye".
-
-- Si se descubre un problema FUERA del alcance:
-  1. **NO arreglarlo** — documentarlo como nota en "Descubrimientos fuera de alcance" del task document
-  2. Si es BLOQUEANTE para la tarea actual: PAUSAR, informar al usuario, esperar decisión
-  3. Si NO es bloqueante: ignorarlo completamente
-- **Test rápido:** ¿Este cambio está en "Incluye"? → SI: proceder. NO: no tocarlo.
-- **Excepción única:** errores de sintaxis/compilación en líneas que YA se están modificando
-- **Prohibido:** arreglar warnings, code smells, o deuda técnica encontrada "de paso"
-
-### Durante Implementacion
-
-Por cada fase completada:
-- Actualizar checkbox del documento de tarea: `[x]` + timestamp + archivos modificados + resultado de verificacion (ruff/mypy)
-- Si se descubre que el alcance era incorrecto - DETENER, comunicar, re-planificar
-- Esperar "proceder" antes de siguiente fase
-
-Tras todas las fases: cambiar estado a `Pending Review` - ejecutar checklist de revision - si APROBADO cambiar a `Completado`.
-
-### Aprobacion Explicita
-
-**APROBADO**: "ejecuta", "adelante", "aprobado", "proceder", "se ve bien"
-**NO APROBADO**: "interesante", "ya veo", preguntas sobre el plan, silencio
-**AMBIGUO**: "ok", "vale", "claro" - confirmar antes de proceder
-<!-- /SHARED-BLOCK -->
-
----
-
-### Directiva: Investigar Versiones Actuales
-
-Antes de agregar dependencias de AI/ML (google-genai, vertexai, openai, langchain), investigar la ultima version estable publicada. No usar versiones hardcodeadas de esta plantilla sin verificar.
 
 ---
 

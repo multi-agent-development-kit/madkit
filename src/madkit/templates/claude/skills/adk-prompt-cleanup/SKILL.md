@@ -1,9 +1,10 @@
 ---
 name: adk-prompt-cleanup
-description: "Corrección de prompts ADK contra desalineamientos semánticos. Activar tras diagnóstico (adk-bottleneck-analysis) que identifique el prompt como causa, o al refactorizar instrucciones de agentes ADK. Skill del agente adk."
+description: "[ADK] En proyectos Google ADK (google-adk SDK): corrección de prompts de agentes contra desalineamientos semánticos. Activar tras diagnóstico (adk-bottleneck-analysis) o al refactorizar instrucciones de agentes ADK."
+paths: ["**/agent.py", "**/agents/**", "**/adk/**/*.py", "**/pyproject.toml"]
 ---
 
-> **CRÍTICO:** Cada limpieza DEBE generar un documento de tarea en `ai_docs/tasks/{NNN}_prompt_cleanup_{scope}.md` ANTES de realizar cambios. Cambios quirúrgicos únicamente — mantener funcionalidad idéntica.
+> **IMPORTANTE:** Verificar que existe task doc para este trabajo antes de continuar. Si no existe, delegar creación a `task-planner` (solo `task-planner` crea `ai_docs/tasks/NNN_*.md`). Cambios quirúrgicos únicamente — mantener funcionalidad idéntica.
 
 ---
 
@@ -35,18 +36,14 @@ Antes de cualquier limpieza, documentar:
 
 Los LLMs generan **CONTENIDO**, no **CÓDIGO**. Prompts que exponen internos del framework causan que el LLM intente operaciones imposibles.
 
-**MAL**: "Store the results in session_state['analysis_result'] for downstream agents."
-→ El LLM intentará: `session_state["analysis_result"] = my_analysis` (imposible para LlmAgents)
+**Patrón → Regla:**
 
-**BIEN**: "Generate a comprehensive analysis covering [areas]."
-→ El framework almacena el output vía `output_key` automáticamente
-
-**Reglas:**
-- Los LLMs generan texto/datos estructurados; el framework almacena vía `output_key`
-- Mencionar callbacks confunde al LLM sobre límites de responsabilidad
-- Sub-agentes secuenciales NO necesitan conocer mecánicas del pipeline
-- La delegación requiere comandos imperativos, no descripciones pasivas
-- Usar verbos de output explícitos (write, generate), no solo verbos mentales (analyze, identify)
+| Anti-patrón | Correcto |
+|-------------|----------|
+| Mencionar `session_state[...]` en instruction | Describir output esperado; el framework almacena vía `output_key` |
+| Mencionar callbacks en instruction | Omitir — el LLM no controla callbacks |
+| Sub-agente secuencial explicando flujo del pipeline | Solo declarar objetivo propio |
+| Delegación pasiva ("transfer control to...") | Imperativo: verbos de output (write, generate, produce) |
 
 ---
 
@@ -64,133 +61,64 @@ Los LLMs generan **CONTENIDO**, no **CÓDIGO**. Prompts que exponen internos del
 
 ## Patrones de Delegación
 
-**Delegación** (`transfer_to_agent`): Transfiere conversación — el agente original se detiene.
-```python
-coordinator = LlmAgent(
-    sub_agents=[specialist_agent],
-    instruction="Call transfer_to_agent(agent_name='specialist') to delegate"
-)
-```
+| Patrón | Mecanismo | El agente original |
+|--------|-----------|-------------------|
+| Transferencia | `transfer_to_agent(agent_name='...')` en instruction | Se detiene |
+| Tool call | `AgentTool(agent=helper)` en `tools=` | Continúa tras recibir resultado |
 
-**Uso de Tool** (`AgentTool`): Llama como función, recibe resultado — el agente original continúa.
-```python
-coordinator = LlmAgent(
-    tools=[AgentTool(agent=helper_agent)],
-    instruction="Use helper tool to analyze data, then proceed"
-)
-```
-
-Delegación debe ser **imperativa** con sintaxis exacta:
-```markdown
-**ACTION REQUIRED:**
-Call the function `transfer_to_agent`:
-transfer_to_agent(agent_name='specialist')
-DO NOT continue without calling this function.
-```
+Delegación debe ser imperativa: `"ACTION REQUIRED: Call transfer_to_agent(agent_name='X'). DO NOT continue without calling this function."` — nunca pasiva ("transfer control to...").
 
 ---
 
 ## Templating de State Keys
 
-```python
-prompt = f"""
-Access this data: {{state_key}}   # ADK template - 2 llaves
-Your config: {config.path}        # Python f-string - 1 llave
-"""
-```
+**Sintaxis:** `{{key}}` (2 llaves) para state keys en instrucciones ADK · `{var}` (1 llave) para Python f-strings · `state["key"]` en Python code (callbacks/tools) · **NUNCA** `{{{{key}}}}` (4 llaves) · En instructions usar descripción semántica del dato, nunca sintaxis de código.
 
-**Reglas de sintaxis:**
-- `{{key}}` (2 llaves) para state keys en instrucciones ADK
-- `{var}` (1 llave) para Python f-strings
-- **NUNCA** `{{{{key}}}}` (4 llaves)
-- En Python code (callbacks/tools): `state["key"]` o `state.get("key", default)`
-- En LLM instructions: descripción semántica del dato, NUNCA sintaxis de código
-
-**Convención de nombres** (ver `adk-workflow-design` § Convención de Nombres):
-- Formato: `{agente}_{tipo_dato}` (ej. `{{researcher_findings}}`, no `{{findings}}`)
-- Prefijos de scope: `app:`, `user:`, `temp:` según persistencia requerida
+**Convención de nombres** (ver `adk-workflow-design` § Convención de Nombres): `{agente}_{tipo_dato}` — prefijos de scope `app:`, `user:`, `temp:` según persistencia.
 
 **Encapsulación:** Agentes de acción → inline `{{key}}`. Agentes de revisión → sección "Available Information" con bloques de código.
 
-**output_key vs callback write:**
-- `output_key`: PREFERIDO para outputs estándar de agentes (el framework almacena automáticamente)
-- Callback write (`ctx.state["key"] = val`): SOLO para inicialización de estado, valores computados pre/post procesamiento, o transformaciones que no son output del LLM
+**output_key vs callback write:** `output_key` es PREFERIDO para outputs estándar (el framework almacena automáticamente). Callback write (`ctx.state["key"] = val`) solo para inicialización, valores computados pre/post, o transformaciones que no son output del LLM.
 
 ---
 
 ## Breaking Change v1.24: Autenticación en Callbacks
 
-Si el proyecto usa `CredentialManager` en callbacks:
-```python
-# ❌ Pre-v1.24 (rompe en v1.24+)
-def auth_callback(callback_context: CallbackContext): ...
-
-# ✅ v1.24+
-def auth_callback(tool_context: ToolContext): ...
-```
-Verificar versión del SDK ANTES de limpiar callbacks con autenticación.
+Si el proyecto usa `CredentialManager`: en v1.24+ los callbacks de auth reciben `tool_context: ToolContext` (NO `callback_context: CallbackContext`). Verificar versión del SDK ANTES de limpiar callbacks con autenticación.
 
 ---
 
 ## Reglas de Limpieza
 
-### Eliminar Referencias a Callbacks
-**Antes**: "design_summary (automatically mapped to design_requirements by callback)"
-**Después**: "{{design_summary}} - Design analysis from Figma"
-
-### Enfocarse en Acciones, No en Mecanismos
-**Antes**: "Store the results in session_state['analysis_result'] for downstream agents."
-**Después**: "Generate a comprehensive analysis covering [areas]."
-
-### Sub-Agentes Secuenciales
-```markdown
-DO NOT use transfer_to_agent. The ADK framework (SequentialAgent) handles flow automatically.
-Your only objective is [specific task].
-```
+| Qué eliminar | Qué poner en su lugar |
+|---|---|
+| Referencias a callbacks en instructions | Omitir — el LLM no controla callbacks; usar `{{key}}` para referenciar datos |
+| `"store in session_state[...]"` | `"Generate [output]"` — el framework almacena vía `output_key` |
+| `"transfer control"` o `"the pipeline will continue"` en SequentialAgent | `"DO NOT use transfer_to_agent. Your only objective is [task]."` |
 
 ---
 
 ## Checklist de Conformidad ADK
 
-**Grep anti-patrones** (adaptar rutas al proyecto):
-```bash
-AGENT_DIR="path/to/agents"
-PROMPT_PATTERN="*prompt*.py"
+**Grep** (desde `AGENT_DIR`, pattern `*prompt*.py`) — todos deben dar 0 resultados:
 
-# Internos ADK (DEBE dar 0 resultados)
-grep -r "via output_key\|via callback\|automatically mapped\|Write to state\|Read from state" "$AGENT_DIR" --include="$PROMPT_PATTERN"
+| Qué buscar | Patrón grep |
+|---|---|
+| Internos ADK en instructions | `"via output_key\|via callback\|automatically mapped\|Write to state\|Read from state"` |
+| Cuádruple llaves | `"{{{{"` |
+| Delegación pasiva | `"transfiere\|delegate.*to.*agent\|transfer control"` (excluir `CALL\|ACTION REQUIRED`) |
+| Credenciales en prompts | `"api.key\|token\|secret\|password\|credential"` |
+| ToolContext en instructions | `"tool_context\|toolcontext"` |
+| Descriptions vacías (`*.py`) | `'description=""'` o `"description=''"` |
 
-# State keys (verificar que todas tienen escritor upstream)
-grep -roh "{{[a-zA-Z_]*}}" "$AGENT_DIR" --include="$PROMPT_PATTERN" | sort -u
-
-# Cuádruple llaves (NUNCA debe existir)
-grep -r "{{{{" "$AGENT_DIR" --include="$PROMPT_PATTERN"
-
-# Delegación pasiva (DEBE dar 0 resultados)
-grep -ri "transfiere\|delega\|delegate.*to.*agent\|transfer control" "$AGENT_DIR" --include="$PROMPT_PATTERN" | grep -v "CALL\|Llama\|Ejecuta\|ACTION REQUIRED"
-
-# Credenciales en prompts (DEBE dar 0 resultados)
-grep -ri "api.key\|token\|secret\|password\|credential" "$AGENT_DIR" --include="$PROMPT_PATTERN"
-
-# Descriptions vacías (DEBE dar 0 resultados)
-grep -rn 'description=""' "$AGENT_DIR" --include="*.py"
-grep -rn "description=''" "$AGENT_DIR" --include="*.py"
-
-# ToolContext mencionado en instructions (DEBE dar 0 resultados)
-grep -ri "tool_context\|toolcontext" "$AGENT_DIR" --include="$PROMPT_PATTERN"
-```
+**State keys**: `grep -roh "{{[a-zA-Z_]*}}"` → extraer todas, verificar escritor upstream para cada una.
 
 **Verificación manual:**
-- [ ] Sin internos ADK (`via output_key`, `via callback`, `automatically mapped`)
-- [ ] Sin secciones `Write to state` / `Read from state`
-- [ ] Sin instrucciones para manipular CallbackContext o session_state
 - [ ] Tools en el prompt coinciden con parámetro `tools` del agente
 - [ ] Formato de output es la última sección del prompt
-- [ ] Sub-agentes secuenciales no intentan delegación
 - [ ] Comandos de output explícitos (write/generate/produce)
-- [ ] Cada agente en sub_agents tiene description de 1-2 líneas descriptivas
-- [ ] Cada FunctionTool tiene docstring con qué hace + cuándo usarla
-- [ ] Ninguna instruction menciona ToolContext o parámetros internos
+- [ ] Cada agente en `sub_agents` tiene description de 1-2 líneas
+- [ ] Cada `FunctionTool` tiene docstring con qué hace + cuándo usarla
 - [ ] Type annotations en TODOS los parámetros de FunctionTools
 
 ---
@@ -207,8 +135,6 @@ Ante la duda, preguntar al usuario — los patrones de proyecto varían.
 
 ## Optimización Automática (v1.27+)
 
-Para optimización basada en métricas (no solo limpieza manual), ADK ofrece:
-```bash
-adk optimize --agent_dir apps/ --agent_name my_agent
-```
-Usa el optimizador GEPA para mejorar instrucciones del root agent basándose en evalsets. Complementario a la limpieza manual — `adk optimize` optimiza para métricas, esta skill limpia anti-patrones del framework.
+Para optimización basada en métricas (no solo limpieza manual): `adk optimize` usa GEPA para mejorar instrucciones del root agent basándose en evalsets. Complementario a la limpieza manual.
+
+> Ver `adk-evaluation-testing` §4 para el flujo completo de `adk optimize` y el orden recomendado (limpiar anti-patrones primero, optimizar métricas después).

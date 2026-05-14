@@ -1,6 +1,6 @@
 ---
 name: unit-testing
-description: "Testing proactivo. Activar SIEMPRE al escribir/modificar código, tras bugfix (regresión obligatoria), y antes de commit si hay archivos sin tests. TDD en tareas complejas. NO para ADK (adk-evaluation-testing) ni /testing_setup."
+description: "Testing proactivo. Activar SIEMPRE al escribir/modificar código, tras bugfix (regresión obligatoria), y antes de commit si hay archivos sin tests. TDD en tareas complejas. NO para ADK (adk-evaluation-testing) ni setup de infraestructura (testing-setup)."
 context: fork
 agent: implementer
 effort: high
@@ -31,7 +31,7 @@ effort: high
 
 | Nivel | Estado | Qué hacer | NO hacer |
 |-------|--------|-----------|----------|
-| **L0** | Sin tests ni framework | Ejecutar `/testing_setup`. Smoke tests del critical path | Cubrir todo de golpe. Forzar hooks |
+| **L0** | Sin tests ni framework | Activar la skill `testing-setup`. Smoke tests del critical path | Cubrir todo de golpe. Forzar hooks |
 | **L1** | Framework existe, <30% coverage | Añadir negative + boundary a módulos críticos | Bloquear CI por coverage |
 | **L2** | >60% coverage, calidad variable | Auditar test smells. Branch coverage. Threshold en CI | Romper flujos CI existentes |
 | **L3** | >80% coverage con calidad | Mutation testing periódico. Contract tests | Sobre-optimizar |
@@ -155,45 +155,22 @@ NO usar "mock" como término genérico:
 
 Aplicar el ciclo RED-GREEN de S12 al bug:
 
-```
-1. REPRODUCIR  → Test que FALLA con el bug presente (RED)
-2. FIXEAR      → Corrección mínima
-3. VALIDAR     → Ejecutar → VERDE
-4. AMPLIAR     → Boundary + corner cases alrededor del bug
-```
+| Paso | Acción |
+|---|---|
+| 1. REPRODUCIR | Test que falla con el bug presente (RED). Sin reproducción = sin garantía de fix. |
+| 2. FIXEAR | Corrección mínima que hace pasar el test. Nada más. |
+| 3. VALIDAR | Ejecutar suite completa → todos verde. |
+| 4. AMPLIAR | Tests adicionales para boundary + corner cases cercanos al bug (parametrizar inputs cuando aplique). |
+
+**Comentario grep-able obligatorio en cada test de regresión** (ver `bugfix/SKILL.md` para variantes por lenguaje): permite búsqueda anti-regresión futura.
 
 Ver S12 para reglas completas del ciclo RED-GREEN-REFACTOR.
-
-**Ejemplo:**
-```python
-# Paso 1: reproduce el bug (RED)
-def test_get_user_by_email_case_insensitive():
-    create_user(email="User@Example.com")
-    result = get_user_by_email("user@example.com")
-    assert result is not None
-
-# Paso 4: ampliar
-@pytest.mark.parametrize("query,stored", [
-    ("USER@EXAMPLE.COM", "user@example.com"),
-    ("  user@example.com  ", "user@example.com"),
-])
-def test_email_normalization(query, stored):
-    create_user(email=stored)
-    assert get_user_by_email(query) is not None
-
-def test_email_not_found():
-    assert get_user_by_email("nonexistent@test.com") is None
-
-def test_email_empty_raises():
-    with pytest.raises(ValueError):
-        get_user_by_email("")
-```
 
 ---
 
 ## S6. Patrones por Stack
 
-**Sin framework de testing detectado →** indicar al usuario que ejecute `/testing_setup`.
+**Sin framework de testing detectado →** indicar al usuario que active la skill `testing-setup`.
 
 Los patrones específicos por framework (TypeScript/React, Python pytest, Django, PHP/Laravel Pest) viven en `references/patterns-by-stack.md`. Cargar ese archivo solo si el stack del proyecto coincide.
 
@@ -295,6 +272,7 @@ php artisan test --coverage --min=80
 - [ ] Hay boundary tests para inputs numéricos/rangos
 - [ ] Los tests de side effects verifican el side effect, no solo el return
 - [ ] Branch coverage cubre ambos lados de cada condicional
+- [ ] **Test "kill the mutant":** comentar/invertir la línea clave del cambio y verificar que ≥1 test del nuevo set falla. Si todos pasan tras la mutación → vanity test, no protege regresión. Sustituto barato de mutation testing automatizado (mutmut, Stryker), captura ~80% del valor sin coste de herramienta.
 
 ---
 
@@ -318,76 +296,35 @@ php artisan test --coverage --min=80
 
 ## S12. Flujo TDD (Test-Driven Development)
 
-Cuando el usuario pide TDD o desarrollo iterativo seguro:
+Activar cuando el usuario pide TDD o desarrollo iterativo seguro.
 
-```
-1. RED    → Escribir test que describe el comportamiento deseado. Ejecutar. DEBE FALLAR.
-2. GREEN  → Escribir el código MÍNIMO para que el test pase. Nada más.
-3. REFACTOR → Limpiar código sin cambiar comportamiento. Tests siguen verdes.
-4. REPETIR → Siguiente test para el siguiente comportamiento.
-```
+| Fase | Regla |
+|---|---|
+| **RED** | Escribir test que describe el comportamiento deseado. Ejecutar. **DEBE fallar** (sin esto, el test no prueba nada nuevo). |
+| **GREEN** | Escribir el código **mínimo** para que el test pase. Sin generalizar, sin optimizar, sin anticipar el siguiente test. |
+| **REFACTOR** | Limpiar manteniendo tests verdes. Si un test falla durante refactor → revertir. |
+| **REPETIR** | Siguiente test para el siguiente comportamiento. Cada ciclo RED-GREEN-REFACTOR < 10 minutos. |
 
-### Reglas TDD
+### Reglas innegociables
 
-- **Nunca escribir código de producción sin un test rojo primero**
-- **El test rojo dicta qué código escribir** — no anticipar
-- **Código mínimo en GREEN** — no optimizar, no generalizar
-- **Refactor solo con tests verdes** — si un test falla durante refactor, revertir
-- **Ciclos cortos** — cada ciclo RED-GREEN-REFACTOR < 10 minutos
+- Nunca código de producción sin un test rojo primero.
+- El test rojo dicta qué código escribir — no anticipar requisitos futuros.
+- Código mínimo en GREEN — la generalización emerge del refactor, no de la imaginación.
+- Refactor solo con todos los tests verdes.
 
-### Orden de implementación TDD
+### Orden canónico de implementación TDD
 
-1. Happy path más simple
-2. Negative tests (validaciones, errores)
-3. Edge cases (límites, vacíos, nulls)
-4. Boundary values (fronteras numéricas)
-5. Integración (interacción entre módulos)
+1. Happy path más simple.
+2. Negative tests (rechazos, validaciones, errores).
+3. Edge cases (vacíos, nulls, límites).
+4. Boundary values (fronteras numéricas N-1, N, N+1).
+5. Integración (interacciones entre módulos).
 
-### Ejemplo ciclo TDD
+### Conceptos clave aplicables
 
-```python
-# --- CICLO 1: RED ---
-def test_calculate_total_single_item():
-    cart = Cart()
-    cart.add_item(name="Widget", price=10.00, quantity=1)
-    assert cart.total() == 10.00
-# Ejecutar → ROJO (Cart no existe)
-
-# --- CICLO 1: GREEN ---
-class Cart:
-    def __init__(self):
-        self.items: list[dict] = []
-    def add_item(self, name: str, price: float, quantity: int) -> None:
-        self.items.append({"price": price, "quantity": quantity})
-    def total(self) -> float:
-        return sum(i["price"] * i["quantity"] for i in self.items)
-# Ejecutar → VERDE
-
-# --- CICLO 2: RED ---
-def test_calculate_total_with_discount():
-    cart = Cart()
-    cart.add_item(name="Widget", price=100.00, quantity=1)
-    cart.apply_discount(percent=10)
-    assert cart.total() == 90.00
-# Ejecutar → ROJO (apply_discount no existe)
-
-# --- CICLO 2: GREEN ---
-# Añadir a Cart:
-def apply_discount(self, percent: float) -> None:
-    self._discount = percent / 100
-def total(self) -> float:
-    subtotal = sum(i["price"] * i["quantity"] for i in self.items)
-    return subtotal * (1 - getattr(self, '_discount', 0))
-# Ejecutar → VERDE
-
-# --- CICLO 2: REFACTOR ---
-# Mover _discount a __init__ para evitar getattr
-def __init__(self):
-    self.items: list[dict] = []
-    self._discount: float = 0.0
-# Tests siguen VERDES → refactor exitoso
-```
+- **Triangulation:** generalizar la implementación solo cuando un segundo test concreto lo justifica.
+- **Fake it till you make it:** primer GREEN puede ser un valor hardcoded; el siguiente RED fuerza la generalización real.
+- **Obvious implementation:** cuando la solución es trivial, escribirla directa sin fakes.
 
 ---
 
-*Versión: 1.0.0 | Creación: 2026-03-18*

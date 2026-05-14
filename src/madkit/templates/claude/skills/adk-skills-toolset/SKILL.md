@@ -1,6 +1,7 @@
 ---
 name: adk-skills-toolset
-description: "SkillToolset de ADK: cargar expertise de dominio vía SKILL.md con progressive disclosure L1/L2/L3. Activar al diseñar agentes ADK con múltiples dominios, bloat de contexto, prompts >5k tokens, o al usar skills externos (google/adk-docs). Audita compliance agentskills.io. Skill del agente adk. NO para crear skills de Claude Code (→ create_skill_template)."
+description: "[ADK] En proyectos Google ADK (google-adk SDK): patrón SkillToolset, carga expertise vía SKILL.md con progressive disclosure L1/L2/L3. Activar con múltiples dominios, bloat de contexto, o prompts >5k tokens. Audita compliance agentskills.io."
+paths: ["**/agent.py", "**/agents/**", "**/adk/**/*.py", "**/pyproject.toml"]
 ---
 
 Cubres el patrón arquitectónico **SkillToolset** de Google ADK: cómo un agente carga expertise de dominio desde archivos `SKILL.md` con progressive disclosure, cuándo usarlo frente a tools o sub-agents, y cómo garantizar compliance con la spec **agentskills.io** (interoperable con Claude Code, Gemini CLI, Cursor).
@@ -8,7 +9,7 @@ Cubres el patrón arquitectónico **SkillToolset** de Google ADK: cómo un agent
 ## Terminología (evitar confusión)
 
 - **ADK Skill** (esta skill): archivo `SKILL.md` cargado por `SkillToolset` en runtime de un agente ADK. Spec: agentskills.io.
-- **Claude Code skill**: archivo `SKILL.md` en `.claude/skills/` que auto-activa al modelo vía frontmatter. Para crearlas → `create_skill_template`.
+- **Claude Code skill**: archivo `SKILL.md` en `.claude/skills/` que auto-activa al modelo vía frontmatter. Para crearlas → `create-skill`.
 - El **formato es idéntico** (misma spec agentskills.io). Una misma carpeta `skills/<name>/` puede servir a ambos ecosistemas.
 
 ## Cuándo usar SkillToolset vs alternativas
@@ -98,18 +99,7 @@ npx skills add google/adk-docs
 
 ### Patrón 4: Skill Factory (meta-skill, AVANZADO)
 
-Agente que genera nuevas `SKILL.md` en runtime. **Warning de seguridad:** requiere write access al filesystem del runtime. Solo en entornos aislados y con validación post-generación.
-
-```python
-skill_creator = models.Skill(
-    frontmatter=models.Frontmatter(name="skill-factory", description="..."),
-    instructions="Genera SKILL.md cumpliendo spec agentskills.io...",
-    resources=models.Resources(references={
-        "spec.md": "...extracto spec...",
-        "example.md": "...ejemplo SKILL.md...",
-    }),
-)
-```
+Agente que genera nuevas `SKILL.md` en runtime via `models.Skill` con `instructions` que describen la spec agentskills.io y `resources.references` con spec + ejemplo. **Warning de seguridad:** requiere write access al filesystem del runtime. Solo en entornos aislados y con validación post-generación.
 
 ## Tools auto-generadas por `SkillToolset`
 
@@ -134,17 +124,7 @@ Para CADA skill del proyecto (tanto propias como externas):
 - [ ] State keys de la skill namespaced (ej. `skill:refund:last_amount`) para evitar colisiones con otras skills o el agente principal
 - [ ] Si la skill hace referencia a tools externas, documentadas explícitamente
 
-**Comando de auditoría rápida:**
-
-```bash
-# Dentro del proyecto ADK, desde raíz:
-for skill in skills/*/SKILL.md; do
-  lines=$(wc -l < "$skill")
-  desc=$(awk '/^description:/,/^---|^name:/' "$skill" | wc -c)
-  echo "$skill | lines=$lines | desc_chars=$desc"
-  [ "$lines" -gt 500 ] && echo "  ⚠️  Excede 500 líneas — extraer a references/"
-done
-```
+**Auditoría rápida:** para cada `skills/*/SKILL.md`, verificar líneas ≤500 y `description` ≤1024 chars. Si excede → extraer a `references/`.
 
 ## Anti-patrones
 
@@ -173,7 +153,7 @@ pip show google-adk | grep Version
 grep -r "SkillToolset\|load_skill_from_dir" $(python -c "import google.adk; print(google.adk.__path__[0])")
 ```
 
-Si la instalación del proyecto no expone `SkillToolset`, actualizar SDK o posponer adopción. Consultar `ai_docs/refs/adk-python/CHANGELOG.md` para la versión exacta.
+Si la instalación del proyecto no expone `SkillToolset`, actualizar SDK o posponer adopción. Consultar `ai_docs/refs/adk-python/CHANGELOG.md` (si disponible en el proyecto, o documentación oficial ADK) para la versión exacta.
 
 ## Cuándo NO adoptar SkillToolset
 
@@ -194,4 +174,4 @@ Si la instalación del proyecto no expone `SkillToolset`, actualizar SDK o pospo
 
 ---
 
-*Skill del agente adk. Exclusiones mutuas: create_skill_template (Claude Code skills, no ADK), adk-workflow-design (diseño general, esta skill cubre el patrón específico).*
+*Skill del agente adk. Exclusiones mutuas: create-skill (Claude Code skills, no ADK), adk-workflow-design (diseño general, esta skill cubre el patrón específico).*

@@ -37,19 +37,7 @@ class Migration(migrations.Migration):
     ]
 ```
 
-### Lotes para Tablas Grandes
-
-```python
-def forward_func(apps, schema_editor):
-    Article = apps.get_model('blog', 'Article')
-    batch_size = 1000
-    total = Article.objects.filter(slug='').count()
-    for i in range(0, total, batch_size):
-        batch = list(Article.objects.filter(slug='')[i:i + batch_size])
-        for article in batch:
-            article.slug = slugify(article.title)
-        Article.objects.bulk_update(batch, ['slug'], batch_size=batch_size)
-```
+Para tablas grandes: sustituir el bucle `.iterator()` + `.save()` por lotes con `bulk_update(batch, ['field'], batch_size=1000)` — evita OOM y reduce señales. Siempre calcular el total antes e iterar por offsets.
 
 ---
 

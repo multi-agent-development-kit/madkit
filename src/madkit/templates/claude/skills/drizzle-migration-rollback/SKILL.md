@@ -51,15 +51,7 @@ Los scripts aseguran carga de `.env.local` mediante `dotenv-cli`.
 
 **Raw SQL solo para:** funciones específicas de BD sin equivalente Drizzle (ej: `to_tsvector`, extensiones).
 
-**Consultas dinámicas:**
-```typescript
-const conditions = [];
-if (userId) conditions.push(eq(table.userId, userId));
-if (status) conditions.push(eq(table.status, status));
-if (tags.length) conditions.push(inArray(table.tags, tags));
-
-const result = await db.select().from(table).where(and(...conditions));
-```
+**Consultas dinámicas:** construir array de condiciones condicionales (`conditions.push(eq(...))`) y pasar `and(...conditions)` al `.where()`. Evitar condiciones hardcodeadas cuando los filtros dependen de parámetros opcionales.
 
 ---
 
@@ -75,7 +67,7 @@ id: serial('id').primaryKey(),
 id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
 ```
 
-**Ventajas:** Control explícito de secuencia, compatible con `$returningId()` en MySQL, estándar SQL.
+Ventaja: control explícito de secuencia, compatible con `$returningId()` en MySQL, estándar SQL.
 
 ---
 
@@ -152,8 +144,7 @@ CREATE FUNCTION match_text_chunks(
 ```
 
 **Tipos para DROP:** `float` → `double precision`, `int` → `integer`, `vector(768)` → `vector`.
-
-`CREATE OR REPLACE` es seguro **solo** cuando cambia el cuerpo de la función (misma firma).
+`CREATE OR REPLACE` es seguro **solo** cuando cambia el cuerpo (misma firma).
 
 ---
 

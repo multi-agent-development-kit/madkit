@@ -1,5 +1,5 @@
 {
-  "_comment": "Configuración opt-in de los 5 hooks deployables. Copiar a .claude/hooks/config.json del proyecto destino y activar solo los hooks deseados. Ver claude-templates/hooks/README.md para detalles.",
+  "_comment": "Configuración opt-in de los hooks deployables. Copiar a .claude/hooks/config.json del proyecto destino y activar solo los hooks deseados. Ver claude-templates/hooks/README.md para detalles.",
 
   "context_monitor": true,
 
@@ -7,9 +7,45 @@
     "mode": "advisory"
   },
 
+  "_comment_read_injection_scanner": "Advisory en READ-time, complementa a prompt-guard (WRITE-time). Útil para sesiones largas con context compression donde inyecciones en archivos leídos pueden sobrevivir al compactador. Default false.",
+  "read_injection_scanner": false,
+
+  "_comment_scaffolding_guard": "Forma compacta (true) = defaults. Forma extendida con excluded_dirs: permite commits de task docs en ai_docs/ sin desactivar el hook entero. excluded_dirs es lista de directorios (sin slash) a excluir de CHECK 1 — otras checks siguen aplicando.",
   "scaffolding_guard": true,
+
+  "_comment_scaffolding_guard_extendida": "Ejemplo forma extendida — descomentar y sustituir scaffolding_guard:true si necesitas excluded_dirs:",
+  "_scaffolding_guard_extendida_ejemplo": {
+    "enabled": true,
+    "excluded_dirs": ["ai_docs"]
+  },
 
   "task_doc_validator": true,
 
-  "session_state": true
+  "_comment_session_state": "Exit silente si ai_docs/STATE.md ausente o vacío. Solo emite additionalContext cuando hay STATE.md con contenido real.",
+  "session_state": true,
+
+  "_comment_sprint_sync": "Valida bidireccionalidad task↔sprint y overlap files_touched cross-task de la misma wave en Write/Edit. Modos: 'advisory' (WARN, exit 0), 'block' ({decision, code, reason} + exit 2).",
+  "sprint_sync": {
+    "mode": "advisory"
+  },
+
+  "_comment_sprint_doc_validator": "Valida estructura del sprint doc al guardar (Estado único, tabla §3, DAG Mermaid). Forma compacta true = mode advisory. Forma extendida {enabled, mode} permite bloqueo (mode: 'block'). Defense-in-depth con sprint-sync (bidireccionalidad) y plan-checker D7 (semántica).",
+  "sprint_doc_validator": {
+    "enabled": true,
+    "mode": "advisory"
+  },
+
+  "_comment_core_context_loader": "Carga MINIMO ESENCIAL de ai_docs/core/*.md al SessionStart con whitelist + pointer index. Default essential_files: ['master_idea.md', 'architecture.md'] (head 30 cada uno); el resto de core/*.md se anuncia como pointer index para read on-demand. Cap en bytes via max_bytes (default 50000 B). _meta/ NO se carga nunca. Default false porque inyecta tokens al system prompt — activar solo cuando el riesgo de divergencia con core/ supera el coste.",
+  "core_context_loader": false,
+
+  "_comment_core_context_loader_extendida": "Forma extendida con todos los parámetros: head_lines [10,200] clamp default 30, max_total_lines [50,1000] clamp default 400, max_bytes [1000,500000] clamp default 50000, essential_files (lista de filenames con extension .md), index_others (default true).",
+  "_core_context_loader_extendida_ejemplo": {
+    "enabled": true,
+    "head_lines": 30,
+    "max_total_lines": 400,
+    "max_bytes": 50000,
+    "essential_files": ["master_idea.md", "architecture.md"],
+    "index_others": true
+  },
+
 }

@@ -35,13 +35,7 @@ description: "Transformar UI genérica en diseño profesional. Activar proactiva
 
 **Tipografia profesional:** Inter, Roboto, Open Sans, Rubik, Poppins, Lato, Space Grotesk, Lexend Deca, Playfair Display (serif), JetBrains Mono (code). Landing pages: 2-3 fuentes (sans-serif + serif acento).
 
-**Dark mode comodo — no negros puros:**
-```tsx
-bg-slate-900 dark:bg-slate-950   // Comodo
-bg-black                          // Evitar
-```
-
-**Fondos alternados:** Secciones alternas con `bg-slate-50 dark:bg-slate-900` / `bg-white dark:bg-slate-950`.
+**Dark mode comodo — no negros puros:** preferir `bg-slate-900/950` sobre `bg-black`; fondos alternados entre `bg-slate-50/bg-white` (light) y `bg-slate-900/bg-slate-950` (dark).
 
 **Border radius consistente:** Elegir un sistema (`rounded-lg`, `rounded-xl`, o `rounded-2xl`) y mantenerlo.
 
@@ -49,27 +43,9 @@ bg-black                          // Evitar
 
 ## Iconos y Tipografia
 
-**Armonia icono-tipografia (strokeWidth):**
-```tsx
-<h2 className="font-semibold"><Star className="w-6 h-6" strokeWidth={2.5} /> Featured</h2>
-<h1 className="font-bold"><Trophy className="w-8 h-8" strokeWidth={3} /> Winner</h1>
-```
+**Armonia icono-tipografia:** ajustar `strokeWidth` al peso de fuente (`font-semibold` → 2.5, `font-bold` → 3). Dimensionar iconos al tamaño de texto circundante (`text-sm`→`w-4`, `text-base`→`w-5`, `text-lg`→`w-6`, `text-xl`→`w-7`; dentro de botones forzar `!w-5 !h-5`).
 
-**Dimensionado de iconos:**
-- `text-sm` → `w-4 h-4`
-- `text-base` → `w-5 h-5`
-- `text-lg` → `w-6 h-6`
-- `text-xl` → `w-7 h-7`
-- Dentro de botones → `!w-5 !h-5`
-
-**shadcn Button — sin espaciado manual:**
-```tsx
-// Correcto
-<Button><PlusIcon className="!w-5 !h-5" />Add Item</Button>
-
-// Incorrecto — el componente maneja el spacing
-<Button><PlusIcon className="!w-5 !h-5 mr-2" />Add Item</Button>
-```
+**shadcn Button:** no añadir `mr-2` ni spacing manual al icono — el componente lo gestiona internamente.
 
 ---
 

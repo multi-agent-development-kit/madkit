@@ -1,6 +1,6 @@
 # CLAUDE.md — Template base del proyecto
 
-> Este archivo se copia al raíz del proyecto destino por `madkit iniciar` (recomendado) o `/setup_project` (modo manual con análisis profundo de docs core), y se adapta por `/calibrate_templates`. Contiene guidance transversal para Claude Code: estilo de respuesta, asignación de modelo y delegación a subagentes.
+> Este archivo se copia al raíz del proyecto destino por `/setup_project` y se adapta por la skill `calibrate-templates`. Contiene guidance transversal para Claude Code: estilo de respuesta, asignación de modelo y delegación a subagentes.
 >
 > **Marcador `[...]`:** los bloques `[entre corchetes]` son placeholders a sustituir durante calibración con valores reales del proyecto.
 
@@ -16,9 +16,31 @@
 
 ---
 
+## Routing de trabajo
+
+Primer dispatch para cualquier petición. Los agentes escanean esta tabla antes de leer el resto.
+La auto-activación por `description:` puede hacer el routing; esta tabla es el fallback explícito.
+
+| Petición del usuario | Primera acción | Agent / Skill |
+|---|---|---|
+| "implementa X", "crea Y", "añade Z" | Task doc → plan-checker → implementer | `task-planner` |
+| "bug", "no funciona", "falla", "roto" | Análisis causa raíz adversarial | skill `bugfix` (fork → reviewer Opus) |
+| "commitea", "guarda", "sube cambios" | Stage + mensaje + guard | skill `commit` |
+| "crea PR", "abre pull request" | Review diff + PR draft | skill `pr` |
+| "qué hago ahora", "estoy perdido" | Diagnóstico → UN siguiente paso | `orientador` |
+| "investiga", ">3 archivos" | Análisis read-only exhaustivo | `researcher` |
+| "actualiza docs" | Correlación diff↔core docs | `doc-syncer` |
+| "sprint", "épica", "roadmap" | DAG + waves + task docs | skill `roadmap-generator` |
+| "cierra sprint", "fin de sprint" | Auditoría cross-task → Sprint PR | ver §Cierre de sprint |
+| "cleanup", "limpia código" | DRY/KISS + edits mínimas | skill `cleanup` |
+| "revisa el diseño", "accesibilidad", "mobile-first", "design tokens", "UI review" | Auditoría adversarial UI/UX | skill `ui-review` (fork → reviewer Opus) |
+| "alinea el proyecto", "inconsistencias", "diagnóstico", "project alignment" | Análisis holístico commits+docs+sprints | `/project_alignment` |
+
+---
+
 ## Estilo de respuesta
 
-Reglas operativas para toda interacción en este proyecto. Objetivo: respuestas precisas y compactas, sin cerimonia innecesaria.
+Reglas operativas para toda interacción en este proyecto. Objetivo: respuestas precisas y compactas, sin ceremonia innecesaria.
 
 - **Frases declarativas.** Sin preámbulo, sin resumen final si la acción ya ocurrió.
 - **No reformular la pregunta** antes de responder.
@@ -26,6 +48,28 @@ Reglas operativas para toda interacción en este proyecto. Objetivo: respuestas 
 - **Bullets cuando la respuesta es enumerable.** Tablas solo si hay ≥3 filas y ≥2 columnas comparables.
 - **No repetir** información que ya está en el diff o en el output del tool.
 - **Comentarios en código:** solo cuando el *por qué* no es obvio (invariante oculto, workaround específico, comportamiento sorprendente). Nunca describir qué hace el código cuando el nombre ya lo dice.
+- **Análisis previo permanente.** Tomarte el tiempo necesario para analizar la solicitud completa, el código tocado y los efectos en cascada antes de actuar. No hay penalización por pausa de razonamiento; sí la hay por implementación apresurada sobre asunción incorrecta.
+- **Herramientas nativas > Bash:** `Grep` sobre `grep`/`rg` en Bash, `Read` sobre `cat`/`head`, `Glob` sobre `ls`/`find`. Bash solo para operaciones sin equivalente nativo: git, compiladores, test runners, gestores de paquetes.
+- **Límite de retries:** si el mismo approach falla dos veces → parar y consultar al usuario antes de la tercera iteración. Iterar sin cambio de estrategia consume tokens sin valor.
+- **Ante ambigüedad: preguntar, no asumir.** Si la solicitud admite ≥2 interpretaciones razonables o si una decisión técnica tiene tradeoff no obvio, pausar y preguntar. Acoplado a P1 (Principios de Ingeniería) — la guía operativa del estilo, no su sustituto.
+
+---
+
+## Principios de Ingeniería
+
+Cuatro reglas mentales que aplican a TODA interacción de código en este proyecto. Cada subagente las hereda — no son guidance opcional. Si una decisión las incumple, parar y revisar antes de seguir.
+
+1. **Don't assume. Don't hide confusion. Surface tradeoffs.**
+   Si la petición es ambigua, preguntar antes de inventar. Si hay un tradeoff entre simplicidad y robustez, decirlo en voz alta y dejar que el usuario decida — no decidir solo. Las asunciones ocultas se convierten en bugs callados.
+
+2. **Minimum code that solves the problem. Nothing speculative.**
+   Cero abstracciones para un solo callsite. Cero feature flags para casos hipotéticos. Cero "por si acaso". Tres líneas similares es mejor que una abstracción prematura. Lo que no se pide, no se construye.
+
+3. **Touch only what you must. Clean up only your own mess.**
+   No reescribir código adyacente "ya que estoy aquí". No introducir refactors no pedidos. Si rompiste algo (ej. una referencia), arreglarlo es tu trabajo. Si encuentras deuda preexistente fuera del alcance, reportar — no arreglar silenciosamente.
+
+4. **Define success criteria. Loop until verified.**
+   Toda tarea no trivial declara criterios de éxito explícitos antes de empezar. Iterar sobre el plan hasta que los criterios sean verificables. Cerrar solo cuando cada criterio está cubierto por evidencia (test, código, diff). Sin verificación, "completado" es opinión.
 
 ---
 
@@ -36,29 +80,71 @@ Esta estructura es **fija** en todos los proyectos del usuario. Los agents la as
 ```
 <proyecto>/
 ├── ai_docs/
-│   ├── core/          # Documentación viva (master_idea, architecture, data_models, decisions)
+│   ├── core/          # Project memory: 4 docs canónicos (ver §"Inventario canónico de ai_docs/core/")
+│   ├── _meta/         # Operativos managed-by-tooling — NUNCA cargado como contexto general (ver §"Inventario canónico" regla 1)
 │   ├── tasks/         # Task docs numerados NNN_nombre.md (gitignored)
+│   ├── sprints/       # Roadmaps de épicas/sprints NN_descripcion.md (opcional)
 │   ├── refs/          # Referencias externas read-only (gitignored)
 │   └── STATE.md       # (opcional, auto-generado) Breadcrumb del context-monitor hook cuando contexto ≤10%
 ├── .claude/
 │   ├── agents/        # 8 subagents desplegados (ver matriz abajo)
-│   ├── commands/      # Slash commands (task_template_*, testing_setup, etc.)
+│   ├── commands/      # Slash commands canónicos (setup_project, task_template, create_task) + references/ (plantillas por stack)
 │   ├── skills/        # Skills en folder/SKILL.md con kebab-case
-│   └── hooks/         # (opcional) Hooks deployables — ver `claude-templates/hooks/README.md`
+│   └── hooks/         # (opcional) Hooks deployables — ver `.claude/hooks/README.md`
 ├── CLAUDE.md          # Config del proyecto (este archivo)
 └── src/ (o equivalente del stack: app/, packages/, wp-content/, etc.)
 ```
 
 **Contratos que los agents asumen:**
-- `task-planner` y `implementer` leen `ai_docs/core/*.md` en su Paso 0.
+- `task-planner` y `implementer` leen `ai_docs/core/*.md` (no recursive — no entra en `_meta/`) en su Paso 0.
+- `reviewer` y `adk` leen subset selectivo `architecture.md` / `data_models.md` / `decisions.md` en su Paso 0 — degradación silenciosa si ausentes.
+- **Conversación principal:** si el hook `core-context-loader` está activado en `.claude/hooks/config.json`, recibe head-30 de los esenciales (default `master_idea.md` + `architecture.md`) + pointer index del resto de `core/*.md` como `additionalContext` al iniciar sesión. Sin el hook, la main session NO ve `ai_docs/core/` — riesgo de regresión contra contratos. Activar para correcciones menores que requieren contexto de dominio sin invocar un subagent.
+- **Bloque YAML `contract:` en task doc (opcional):** `task-planner` lo produce; `implementer` lee `contract.parallelizable_phases:` para paralelización fractal de fases dentro de la task; `reviewer` valida coherencia contract↔implementación. Schema completo en `task_template.md` §"Bloque contract:". La mecánica de waves declaradas en `parallelizable_phases:` se describe en §Paralelización más abajo.
 - `task-planner` y `/status` leen `ai_docs/STATE.md` si existe (breadcrumb tras contexto agotado).
-- `doc-syncer` escribe SOLO en `ai_docs/core/` y `ai_docs/tasks/`.
+- `doc-syncer` escribe SOLO en `ai_docs/core/` y `ai_docs/tasks/` — NUNCA toca `ai_docs/_meta/` (propiedad de `setup_project` y `calibrate-templates`).
 - `researcher` puede leer todo pero no modifica nada.
 - `git-guardian` NUNCA commitea `ai_docs/`, `.claude/`, `.cursor/` (scaffolding guard) y limpia `ai_docs/STATE.md` al cerrar el último commit del task referido.
-- Task docs viven en `ai_docs/tasks/` — numeración global incremental, un solo archivo por número.
+- Task docs viven en `ai_docs/tasks/` — numeración global incremental, un solo archivo por número. **Formato filename:** `NNN_<descriptor>.md` para tareas atómicas; `NNN_sNN_<descriptor>.md` para tareas vinculadas a sprint (sufijo `_sNN_` con padding 2 dígitos derivado del sprint). El sufijo es validado mecánicamente por `task-doc-validator.js` contra la cabecera `> **Sprint:** NN` del cuerpo del task doc — discrepancia es BLOCKER `SPRINT_SUFFIX_MISMATCH`. Convención de naming dentro del descriptor sigue el stack (snake_case en Python/Django, camelCase en TS/PHP/WP, UPPER_SNAKE_CASE en ADK).
 - Hooks en `.claude/hooks/` son opt-in (instalados por `setup_project` Fase 1.6); cada uno revisa `.claude/hooks/config.json` antes de activarse.
 
+**Split-workspace:** `ai_docs/` vive normalmente en el git toplevel del proyecto. Si `.claude/` está en un directorio padre NO-git (split-workspace con microservicios, monorepos con `.claude/` compartido), `setup_project` detecta la discrepancia y crea `.claude/.ai_docs_path` con la ruta absoluta al directorio donde vive `ai_docs/`. Todos los hooks leen ese archivo y hacen fallback a `CLAUDE_PROJECT_DIR/ai_docs/` si el archivo está ausente — cero regresión en proyectos canónicos (cwd == git toplevel). El archivo `.claude/.ai_docs_path` es texto plano UTF-8: una línea no vacía con la ruta absoluta normalizada; líneas con `#` son comentarios ignorados.
+
 Si la estructura difiere en un proyecto concreto (legacy, cliente impuso otra), declararlo aquí en la sección "Convenciones del proyecto" — los agents leerán la excepción.
+
+---
+
+## Inventario canónico de `ai_docs/core/`
+
+Fuente única de verdad sobre qué archivos viven en `core/` y `_meta/`, quién los escribe y cuándo. El resto de archivos (subagents, skills, hooks, comandos) cita esta sección — no duplica.
+
+### Project memory (`ai_docs/core/`) — 4 docs canónicos
+
+| Archivo | Propósito | Prioridad | Generador inicial | Regenerador post-impl | Inyectado por hook |
+|---|---|---|---|---|---|
+| `master_idea.md` | Visión, problema, usuarios, MVP, restricciones, scope negativo | P0 mandatorio | Pipeline del proyecto (si existe) o redacción manual | `doc-syncer` cuando el diff cambia el alcance del producto | Sí (esencial, head-30) |
+| `architecture.md` | Diagrama, capas, contratos entre módulos, stack, deployment, seguridad | P0 mandatorio | Pipeline del proyecto o manual | `doc-syncer` cuando el diff introduce módulo/endpoint/patrón nuevo | Sí (esencial, head-30) |
+| `data_models.md` | Schemas, entidades, relaciones, campos canónicos | P0 mandatorio | Pipeline del proyecto o manual | `doc-syncer` cuando el diff toca schemas | Pointer (read on-demand) |
+| `decisions.md` | ADRs y decisiones aceptadas con justificación | P1 lazy-create | `doc-syncer` al detectar primera decisión nueva | `doc-syncer` append-only | Pointer (read on-demand) |
+
+### Referencias internas en `core/`
+
+**Regla:** `master_idea.md` y `architecture.md` mantienen al final del archivo `## Referencias internas` con ≥1 bullet por cada otro doc canónico de `core/` presente (ej: `` `data_models.md` — schemas; leer cuando el trabajo toque persistencia ``). Permite que la inyección head-30 de `core-context-loader` deje pistas sobre qué archivos del pointer index leer on-demand.
+
+**Mantenimiento:** `doc-syncer` actualiza los bullets cuando el diff añade, elimina o cambia alcance de un doc en `core/`. `_meta/` nunca se referencia aquí — queda fuera del SSOT y del scope del hook.
+
+**Filosofía:** los 2 docs esenciales se inyectan al SessionStart vía `core-context-loader`; los 2 lazy/pointer se listan como índice y se leen con Read tool cuando un trabajo lo requiera. Esto reduce tokens al system prompt sin perder coherencia con contratos.
+
+**Documentos NO canónicos:** `app_pages_and_functionality.md`, `wireframe.md`, `ui_theme.md`, `app_name.md`, `roadmap.md` viven fuera del SSOT. Si el proyecto los usa, vivirán como sub-secciones de `architecture.md` o como archivos opcionales fuera del scope de `doc-syncer` y del hook.
+
+### Operativos managed-by-tooling (`ai_docs/_meta/`)
+
+| Archivo | Propietario único (escribe) | Procesos que leen | Lifecycle |
+|---|---|---|---|
+| `_meta/ecosystem_state.md` | `calibrate-templates` Fase 3.6 | `sync-upstream-trigger` Pasos 4.5/4.8; `calibrate-templates` siguientes calibraciones | Sync-driven (reescrito FULL-PASS, parcial INCREMENTAL) |
+| `_meta/setup_report.md` | `/setup_project` Fase 5.1 | `calibrate-templates` Fase 0.3 (extracción de perfil stack) | One-shot al bootstrap |
+| `_meta/framework_versions.md` | Manual / pipeline del proyecto | Solo cuando se planifica un upgrade del stack | Cambia con upgrades del stack |
+
+**Regla `_meta/` (CRITICAL):** nunca se carga como contexto general. Solo `setup_project`, `calibrate-templates` y `sync-upstream-trigger` lo tocan. `doc-syncer` y subagents nunca acceden. La memoria del proyecto vive en `core/`. `core-context-loader` hook lee sólo `core/` (no recursive); `_meta/` nunca aparece en la inyección.
 
 ---
 
@@ -70,32 +156,37 @@ Solo los **subagents** (`.claude/agents/*.md`) cambian de modelo de forma segura
 
 | Agent | Modelo | Effort | Por qué |
 |---|---|---|---|
-| `task-planner` | opus | xhigh (default) | Planificación crítica: triaje, radio de impacto, corner cases, edge cases. Produce el task doc que guía toda la implementación. |
-| `reviewer` | opus | xhigh (default) | Revisión correlacionada de 8 áreas en un pase. Perder correlaciones = iteración extra. |
-| `adk` | opus | xhigh (default) | Arquitectura ADK, decisiones con coste alto de error (llamadas LLM, state keys, evalsets). |
-| `implementer` | sonnet | high | Ejecuta planes ya triados. Skills pesadas (unit-testing, cleanup*) le delegan vía `context: fork`. |
+| `task-planner` | sonnet | xhigh (→high) | Planificación: triaje, radio de impacto, corner cases, edge cases. El gate de calidad es plan-checker (fork → reviewer Opus). |
+| `reviewer` | opus | xhigh (default) | Revisión correlacionada de 8 áreas en un pase. Gate adversarial de plan-checker y bugfix. Perder correlaciones = iteración extra. |
+| `adk` | sonnet | xhigh (→high) | Orquestación ADK, decisiones arquitectónicas. Reviewer (Opus) valida el output. |
+| `implementer` | sonnet | medium | Ejecuta planes ya triados y validados por plan-checker. Sonnet previene gaming de validaciones (haiku añadía suppressors: eslint-disable, noqa, ts-ignore). Skills pesadas (unit-testing, cleanup*) le delegan vía `context: fork`. |
 | `doc-syncer` | sonnet | high | Sincroniza `ai_docs/core/` con el diff real. Memory: project — acumula patrones entre sesiones. |
 | `researcher` | sonnet | xhigh | Análisis exhaustivo de dependencias y acoplamientos. Reemplaza el built-in Explore. Solo lectura. |
-| `orientador` | sonnet | medium | Detecta el estado del proyecto y sugiere UN solo siguiente paso accionable. Para usuarios no técnicos: activa con "qué hago ahora", "estoy perdido", "ayuda". Tools read-only. |
+| `orientador` | haiku | medium | Detecta el estado del proyecto y sugiere UN solo siguiente paso accionable. Para usuarios no técnicos: activa con "qué hago ahora", "estoy perdido", "ayuda". Tools read-only. |
 | `git-guardian` | haiku | low | Orquesta skills mecánicas (commit, pr, diff, worktree). Sistema de "confianza baja no ejecuta" protege casos complejos. |
 
 **Cómo obtener el cambio de modelo donde importa:**
 
-- **Skills con `context: fork` + `agent: <subagent>`** (unit-testing, cleanup*, task-implementation-review) abren sesión aislada con el modelo del subagent elegido. Este es el patrón principal para ejecutar trabajo pesado fuera del hilo del usuario.
+- **Skills con `context: fork` + `agent: <subagent>`** (unit-testing, cleanup×4, task-implementation-review, plan-checker, roadmap-generator, roadmap-reviewer, bugfix) abren sesión aislada con el modelo del subagent elegido. Este es el patrón principal para ejecutar trabajo pesado fuera del hilo del usuario.
 - **Skills sin `context: fork`** heredan el modelo del invocador (sesión del usuario o subagent que las llamó). Ejemplo: `git-guardian` (haiku) invoca `commit` → `commit` corre en haiku.
 - **Skills invocadas directamente por el usuario** (p.ej. `/commit`) heredan el modelo de la sesión activa. Para ejecutarlas en un modelo distinto, invocar el subagent correspondiente.
 
-**Regla:** nunca bajar planificación ni revisión de opus por ahorrar tokens. Una iteración mal hecha cuesta más que cualquier ahorro.
+**Regla:** nunca bajar REVISIÓN de opus. El reviewer (Opus) es el único gate de calidad del sistema — toda iteración de calidad pasa por él. Planificación (task-planner) y ejecución (implementer) usan sonnet; git-guardian y orientador usan haiku para ops mecánicas sin decisiones de calidad de código.
 
-**Slash commands** (`.claude/commands/*.md`) heredan el modelo de la sesión activa — no soportan `model:` en frontmatter. Para planificación, abrir sesión en Opus antes de invocar `/create_task`, `/task_template_*` o similares.
+**Slash commands** (`.claude/commands/*.md`) heredan el modelo de la sesión activa — no soportan `model:` en frontmatter. Para planificación, `task-planner` subagent (sonnet, xhigh→high) auto-activa al detectar triggers de planificación — no requiere acción manual del usuario salvo invocación explícita de `/create_task` o `/task_template`. Las operaciones `calibrate-templates`, `sync-upstream-trigger`, `testing-setup`, `create-skill` son **skills** con auto-activación contextual. `/adk_orchestrator_template` se mantiene como command porque su flujo multi-turno (auditoría → input/clarificación → diseño) requiere interacción usuario↔asistente en main session — incompatible con `context: fork`.
 
-### Slash commands por familia mental (T086)
+### Slash commands por familia mental
 
 Categorización organizativa para discoverability. Los nombres físicos no cambian:
 
-- **Familia `proyecto`** — `/setup_project`, `/sync_upstream`, `/calibrate_templates`, `/testing_setup`.
-- **Familia `tarea`** — `/create_task`, `/task_template`, `/task_template_{python,typescript,django,php,adk,wordpress}`, `/create_skill_template`, `/adk_orchestrator_template`.
+- **Familia `proyecto`** — `/setup_project`. Skills auto-activables: `sync-upstream-trigger`, `calibrate-templates`, `testing-setup`.
+- **Familia `tarea`** — `/create_task` (delegador a `task-planner` subagent), `/task_template` (genérico, fallback manual), `/adk_orchestrator_template` (diseño multi-turno de orquestador ADK con auditoría exhaustiva pre-fase 0). Skills auto-activables: `create-skill`. Las plantillas por stack viven en `commands/references/` y las carga `task-planner` automáticamente según stack detectado.
+- **Familia `épica/sprint`** — `/sprint <descripción>`: genera o extiende un sprint con waves del DAG y task docs vinculados; activa internamente `roadmap-generator` skill (fork → `task-planner`).
 - **Familia `git`** — operaciones git como skills auto-activables: `commit`, `pr`, `diff`, `worktree-management` (no son slash commands).
+
+---
+
+## Glosario canónico (`commands/references/glossary.md`)
 
 ---
 
@@ -109,36 +200,64 @@ Delegar a subagentes (Agent tool) **aísla contexto**: los logs, greps y lectura
 |---|---|---|
 | **Investigación exhaustiva previa al triaje** (>3 archivos probables, cambio con acoplamientos no triviales) | `researcher` (sonnet xhigh) | Mapea dependencias, callers, callees, contratos afectados en código real. Reemplaza al built-in Explore (descartado por falsos positivos). |
 | **Consulta a refs externos** (`ai_docs/refs/`, documentación SDK) | `researcher` | Extrae fragmento canónico de volúmenes grandes sin cargarlos en el padre. |
-| **Ejecución mecánica de un plan ya triado** | `implementer` (sonnet high) | Hace los cambios sin tomar decisiones de estrategia. Puede paralelizarse en N módulos disjuntos. |
+| **Ejecución mecánica de un plan ya triado** | `implementer` (sonnet, medium) | Hace los cambios sin tomar decisiones de estrategia. Puede paralelizarse en N módulos disjuntos. |
 | **Actualización de docs post-trabajo** | `doc-syncer` (sonnet high) | Correlaciona criterios de éxito con diff, actualiza `ai_docs/core/`, reporta gaps. |
-| **Skills pesadas con `context: fork`** (unit-testing, cleanup*, task-implementation-review) | El subagent declarado en `agent:` | Sesión aislada con el modelo elegido. No contamina el hilo del usuario. |
+| **Skills pesadas con `context: fork`** (unit-testing, cleanup×4, task-implementation-review, plan-checker, roadmap-generator, roadmap-reviewer, bugfix, ui-review) | El subagent declarado en `agent:` | Sesión aislada con el modelo elegido. No contamina el hilo del usuario. |
+| **Usuario perdido, sin acción clara** ("qué hago ahora", "estoy perdido", "ayuda") | `orientador` (haiku, medium) | Sugiere UN solo siguiente paso accionable; tools read-only; NO planifica ni implementa. |
+| **Validación del ecosistema desplegado** | `onboarding` skill | Invocar tras la skill `calibrate-templates` o antes de la primera implementación; o cuando un agent detecta frontmatter inválido en una skill desplegada (verifica frontmatter, refs, exclusiones mutuas). |
 
 ### Casos donde explícitamente NO delegar
 
 - **Revisión de código correlacionada.** `reviewer` revisa 8 áreas en un pase. NO fragmentar en subagents paralelos por área — se pierden correlaciones cross-área (un smell puede implicar hueco de testing + inseguridad simultáneamente). Dividir por archivos sí; por áreas no.
-- **Triaje de tarea.** El análisis de radio de impacto, atomicidad y corner cases es precisamente el trabajo del agente padre. Solo se delega la investigación previa que alimenta al triaje.
-- **Bugfix.** Requiere razonamiento correlacionado con lo que el usuario está viendo. No va en `context: fork` — comparte contexto con la conversación padre.
+- **Triaje de tarea.** El análisis de radio de impacto, atomicidad y corner cases es precisamente el trabajo del agente padre. Solo se delega la investigación previa que alimenta al triaje. **Criterio mecánico:** si el triaje requiere mapear >3 archivos o acoplamientos no triviales, delegar investigación previa a `researcher` (read-only, xhigh) antes de continuar. Tras recibir el informe comprimido, el agente padre ejecuta el triaje con contexto completo.
+- **Bugfix.** Va en `context: fork` → `reviewer` (Opus) para garantizar análisis de causa raíz adversarial. Si el fix es complejo (3+ archivos), escalar a `task-planner` que creará un task doc y delegará a `implementer`.
 - **Lectura de archivo único con objetivo claro.** Si sabes qué archivo leer y para qué, léelo directo.
 
 ### Paralelización
 
-Cuando `task-planner` detecta N módulos **independientes con archivos disjuntos** (p.ej. "actualiza auth, billing y notifications"), lanzar N `implementer` en paralelo (una sola respuesta con múltiples `Agent(...)`). Tras todos los cierres, un único `reviewer` correlacionado y finalmente `doc-syncer`.
+N módulos disjuntos → N `implementer` en paralelo (una sola respuesta). NO si comparten archivos o contratos. El task doc con `contract.parallelizable_phases:` declara fronteras de paralelización fractal intra-task — el orquestador DEBE lanzar N `implementer` por wave declarada. Serializar paralelo declarado es violación de scope. Reglas completas en `commands/references/canonical-chain.md`.
 
-**NO paralelizar** si los módulos comparten archivos, dependencias transitivas o contratos.
+**Dos niveles de revisión adversarial (simbióticos y diferenciados):**
+
+| Gate | Skill | Cuándo | Qué revisa | Output |
+|---|---|---|---|---|
+| Estratégico (sprint) | `roadmap-reviewer` (fork → reviewer Opus, `effort: high`) | Post `roadmap-generator`, pre Wave 1 | Cobertura de requisitos, DAG, alcance, criterios de éxito del sprint como unidad | GO / BLOCKED sprint |
+| Semántico (task pre-impl) | `plan-checker` × N (fork → reviewer Opus) | Post task doc, pre `implementer` | 10 dimensiones del task doc en aislamiento | GO / BLOCKED task |
+| Calidad (task post-impl) | `task-implementation-review` × N (fork → reviewer Opus) | Post `implementer`, pre `reviewer` final | Criterios concretos de la task contra el diff | PASS / FAIL task |
+| Correlacionado (código) | `reviewer` (Opus, un solo pase) | Post implementación completa | 8 áreas de código: code smells, DRY, KISS, dead code, SoC, seguridad, testing, integración | APROBAR / CORREGIR |
+
+Solo `reviewer` puede cambiar `status: approved` y rellenar `completed_at` en el task doc.
+
+**Roadmap-reviewer gate (OBLIGATORIO):** tras `roadmap-generator` (fork → `task-planner`), la **sesión principal** DEBE invocar `roadmap-reviewer` antes de autorizar Wave 1. `task-planner` no puede invocar skills desde su fork (limitación #38719) — el output de `roadmap-generator` incluye `[ROADMAP-GENERATOR COMPLETE]` como señal explícita para la sesión principal.
+
+**Reglas de paralelización (detalle en `commands/references/canonical-chain.md`):**
+- **`plan-checker × N` paralelo por wave:** antes de cada wave, N plan-checkers en una sola respuesta.
+- **`reviewer` NUNCA se fragmenta:** un solo pase correlacionado. Si diff >300L / >10 archivos: dividir por archivos (NO por áreas), revisar secuencialmente.
+
+**Responsabilidad de creación de task docs (regla canónica imperativa):**
+
+Solo `task-planner` puede crear archivos en `ai_docs/tasks/NNN_*.md`. Esta regla es **absoluta** en este proyecto y en cualquier proyecto que use estos templates:
+
+| Canal | Autorizado | Mecánica |
+|---|---|---|
+| `task-planner` (directo, vía triaje) | ✅ | Usuario o main session invoca `task-planner` con descripción del trabajo. Triaje + plantilla por stack + plan-checker. |
+| `roadmap-generator` Fase C/E.2 (skill `context: fork` → `task-planner`) | ✅ | El fork `task-planner` host crea físicamente cada `NNN_*.md`. Para emisión paralela: spawn de N `task-planner` forks adicionales. |
+| `/create_task` slash command | ✅ | Comando en main session que delega internamente a `task-planner`. |
+| `implementer` | ❌ NUNCA | Si recibe prompt "crear TNNN" → reportar `[SCOPE ERROR] No autorizado a crear task docs. Redirige al orquestador para invocar 'task-planner' o '/create_task'`. NO crear archivos. |
+| Cualquier otro agente (`adk`, `doc-syncer`, `git-guardian`, `reviewer`, `researcher`, `orientador`) | ❌ | Mismo trato que `implementer`. |
+| Main session sin invocar `task-planner` | ❌ | El orquestador DEBE delegar a `task-planner` antes de escribir en `ai_docs/tasks/`. |
+
+**Por qué:** sin pasar por `task-planner`, el task doc no aplica plantilla por stack (rompe consistencia), salta el triaje (P1+P4 sin anclar; criterios de éxito no verificables), no genera bloque `contract:` con `parallelizable_phases:` correcto, no inyecta los 4 Criterios de Calidad de Ingeniería canónicos (Paso 7.4 → falla `plan-checker` D10 + hook `task-doc-validator`), y `plan-checker` D1-D10 recibe input inválido. `reviewer` correlacionado detecta el patrón post-hoc y emite `[VIOLATION]` informativo.
+
+### Encadenamiento canónico
+
+Flujo completo subagent→subagent (con variantes bugfix/ADK/sprint) en `commands/references/canonical-chain.md`. Los subagents y skills lo citan sin duplicarlo.
+
+**Cierre de sprint:** cuando todas las waves están completas, invocar `reviewer` (Opus, un pase sobre el diff completo del sprint) con foco en (a) dead code cross-task, (b) problemas de integración entre waves, (c) oportunidades para el backlog. Output: informe CIERRE con sección "Oportunidades". Detalle en `commands/references/canonical-chain.md §Sprint closure`.
 
 ### Agent Teams (experimental, manual)
 
-Para escenarios con hipótesis competidoras (bugfix CRÍTICO sin causa clara, decisión arquitectónica con 3+ alternativas legítimas), considerar Agent Teams:
-
-1. Activar con `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`.
-2. Los teammates comparten task list, debaten entre sí, convergen en la respuesta.
-3. Coste: cada teammate es una sesión Claude Code completa → mayor consumo de tokens.
-
-Los agents pueden **sugerir** Agent Teams al usuario, nunca activarlos automáticamente.
-
-### Regla general
-
-> Delega lo que es investigación o ejecución mecánica cuyo detalle no se reutilizará literal. Mantén el criterio analítico (triaje, revisión correlacionada, decisiones arquitectónicas) en el agente padre.
+Para hipótesis competidoras (bugfix CRÍTICO sin causa clara, 3+ alternativas arquitectónicas): activar con `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`. Alto coste — un agente completo por teammate. Los agents pueden sugerir; nunca activar automáticamente.
 
 ---
 
@@ -160,6 +279,16 @@ Los agents pueden **sugerir** Agent Teams al usuario, nunca activarlos automáti
 - **Naming:** [snake_case/camelCase según stack]
 - **Commits:** [conventional-commits / formato libre]
 - **Branches:** [feat/fix/chore / main-only / ...]
+
+### Convenciones de commits y PRs sprint
+
+Aplican solo cuando el proyecto adopta `roadmap-generator` (workflow sprint):
+
+- **Commit work-unit:** `<type>: <subject> — T<NNN> (Sprint <NN>, Wave <W>)` (ej: `update: auth middleware — T145 (Sprint 04, Wave 1)`).
+- **Commit cierre de sprint:** `<type>: Cierra Sprint <NN> — <título épica>`.
+- **Sprint PR único** (default cuando sprint cierra): 1 PR a main agrupa los N commits work-unit. Body autogenerado desde sprint doc (§4 DAG + tabla §3).
+- **Stacked PRs por wave** (opt-in): si revisión wave-a-wave prevalece sobre velocidad.
+- **Sufijo `_sNN_` en filename de tasks sprint-bound:** `NNN_sNN_<descriptor>.md`. Validado por `task-doc-validator.js` contra cabecera `> **Sprint:** NN`; mismatch es BLOCKER `SPRINT_SUFFIX_MISMATCH`. Tasks atómicas (sin sprint) mantienen `NNN_<descriptor>.md`.
 
 ---
 

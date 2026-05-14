@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
-# hook-version: 1.0.0
 # Session State — SessionStart hook
 #
-# Cierra el loop con context-monitor (T077) que ESCRIBE ai_docs/STATE.md cuando contexto ≤10%.
+# Cierra el loop con context-monitor que ESCRIBE ai_docs/STATE.md cuando contexto ≤10%.
 # Este hook LEE el head al iniciar la siguiente sesión e inyecta el contexto al system prompt
 # como `additionalContext`. Sin esto, STATE.md queda dormido hasta que el usuario o el
 # task-planner Paso 0 lo abren manualmente.
@@ -23,21 +22,58 @@ CONFIG_PATH="$CWD/.claude/hooks/config.json"
 if [ ! -f "$CONFIG_PATH" ]; then
   exit 0
 fi
-ENABLED=$(node -e "try{const c=require('$CONFIG_PATH');process.stdout.write(c.session_state===true?'1':'0')}catch{process.stdout.write('0')}" 2>/dev/null)
+ENABLED=$(node -e '
+  const fs = require("fs");
+  try {
+    const c = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+    process.stdout.write(c.session_state === true ? "1" : "0");
+  } catch {
+    process.stdout.write("0");
+  }
+' "$CONFIG_PATH" 2>/dev/null)
 if [ "$ENABLED" != "1" ]; then
   exit 0
 fi
 
+# Resolución robusta de la ruta a ai_docs/ mediante .claude/.ai_docs_path.
+# Fallback garantizado a cwd/ai_docs para cero regresión en proyectos canónicos.
+# Usa node para parsear el archivo (cross-platform, maneja BOM + CRLF + comentarios).
+AI_DOCS_DIR=$(node -e '
+  const fs = require("fs");
+  const path = require("path");
+  const cwd = process.argv[1];
+  const overridePath = path.join(cwd, ".claude", ".ai_docs_path");
+  try {
+    const raw = fs.readFileSync(overridePath, "utf8").replace(/^﻿/, "");
+    const resolved = raw.split(/\r?\n/)
+      .map(function(l) { return l.trim(); })
+      .filter(function(l) { return l && !l.startsWith("#"); })[0];
+    if (resolved && path.isAbsolute(resolved) && fs.existsSync(resolved)) {
+      process.stdout.write(resolved);
+      process.exit(0);
+    }
+  } catch (_) { /* fallback */ }
+  process.stdout.write(path.join(cwd, "ai_docs"));
+' "$CWD" 2>/dev/null)
+if [ -z "$AI_DOCS_DIR" ]; then
+  AI_DOCS_DIR="$CWD/ai_docs"
+fi
+
 # Leer ai_docs/STATE.md head (20 líneas) si existe
-STATE_PATH="$CWD/ai_docs/STATE.md"
+STATE_PATH="$AI_DOCS_DIR/STATE.md"
 STATE_PRESENT="false"
 STATE_HEAD=""
 ACTIVE_TASK=""
 
-if [ -f "$STATE_PATH" ]; then
+if [ -f "$STATE_PATH" ] && [ -s "$STATE_PATH" ]; then
   STATE_PRESENT="true"
   STATE_HEAD=$(head -20 "$STATE_PATH" 2>/dev/null)
   ACTIVE_TASK=$(printf '%s' "$STATE_HEAD" | grep -E '^active_task:' | head -1 | sed 's/^active_task:[[:space:]]*//' | tr -d '\r')
+fi
+
+# Si STATE.md no existe, exit silente — cero tokens desperdiciados.
+if [ "$STATE_PRESENT" != "true" ]; then
+  exit 0
 fi
 
 # Construir JSON de salida — additionalContext para SessionStart hook protocol
@@ -45,21 +81,17 @@ fi
 node -e '
   const [statePresent, stateHead, activeTask] = process.argv.slice(1);
   const lines = ["## Estado del proyecto (session-state hook)", ""];
-  if (statePresent === "true") {
-    lines.push("`ai_docs/STATE.md` detectado — sesión retomada. Tarea, fase y última acción:");
-    lines.push("");
-    if (stateHead) lines.push(stateHead);
-    lines.push("");
-    lines.push("Para continuar: lee el task doc referenciado en `active_task:` y ejecuta `/status` para ver waves pendientes.");
-  } else {
-    lines.push("Sin `ai_docs/STATE.md` — sesión limpia. Si retomando trabajo, ejecuta `/status` para inventario de tareas ABIERTAS / EN_PROGRESO.");
-  }
+  lines.push("`ai_docs/STATE.md` detectado — sesión retomada. Tarea, fase y última acción:");
+  lines.push("");
+  if (stateHead) lines.push(stateHead);
+  lines.push("");
+  lines.push("Para continuar: lee el task doc referenciado en `active_task:` y ejecuta `/status` para ver waves pendientes.");
   const additionalContext = lines.join("\n");
   process.stdout.write(JSON.stringify({
     hookSpecificOutput: {
       hookEventName: "SessionStart",
       additionalContext,
-      state_present: statePresent === "true",
+      state_present: true,
       active_task: activeTask || null,
     },
   }));

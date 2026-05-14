@@ -1,6 +1,8 @@
 # Plantilla de Tarea AI (Protocolo Genérico)
 
 > Protocolo genérico de creación de documentos de tarea para desarrollo impulsado por IA. Las plantillas especializadas por stack (TypeScript, Python, Django, PHP, ADK, WordPress) extienden este protocolo con análisis y validación específicos.
+>
+> **Quién aplica esta plantilla:** SOLO `task-planner` (vía triaje directo) o `roadmap-generator` Fase C/E.2 (que corre en `context: fork` → `task-planner`, donde el fork es quien crea físicamente cada `NNN_*.md`). Cualquier otro agente que reciba un prompt para "crear task" debe rechazar con `[SCOPE ERROR]` y redirigir al orquestador para invocar `task-planner` o `/task-creator`. Regla canónica: `CLAUDE.md §"Cuándo delegar" / "Responsabilidad de creación de task docs"`.
 
 ---
 
@@ -9,6 +11,8 @@
 **Esta plantilla crea un DOCUMENTO DE PLANIFICACIÓN únicamente. NO implementar cambios directamente.**
 
 ---
+
+> **Nota de numeración:** Las secciones del task doc generado se numeran del 1 al 16. La tabla de clasificación de complejidad (abajo) indica qué secciones incluir para cada nivel. Usar solo las secciones indicadas — omitir las restantes. NO renumerar las secciones omitidas: mantener los números originales para que plan-checker, reviewer y sprint-sync puedan referenciarlas por número constante.
 
 ## CLASIFICACIÓN DE COMPLEJIDAD DE TAREA - LEE ESTO PRIMERO
 
@@ -141,9 +145,49 @@ Todas las verificaciones deben pasar antes de proceder al Paso 0.0.6.
 
 ## Cabecera de Metadatos del Task Doc (opcional)
 
-> Documenta 3 elementos opcionales que el task doc generado puede incluir en su cabecera (formato blockquote `> **Campo:** valor`). Activar SOLO si el proyecto usa flujos con dependencias entre tareas (`depends_on:`) o el plan-checker pre-implementación. Para tareas aisladas SIMPLE, omitir esta cabecera completa.
+> Documenta 4 elementos opcionales que el task doc generado puede incluir en su cabecera (formato blockquote `> **Campo:** valor`). Activar SOLO si el proyecto usa flujos con dependencias entre tareas (`depends_on:`), sprints/épicas, o el plan-checker pre-implementación. Para tareas aisladas SIMPLE, omitir esta cabecera completa.
 >
 > Ubicación recomendada: justo después del título `# Tarea NNN: ...` y antes de `## 1. Resumen de la Tarea`.
+
+### `> **Sprint:** NN` (opcional) — pertenencia a sprint
+
+Entero con padding 2 dígitos (`01`, `02`, ..., `99`). Declara que esta task pertenece a un sprint/épica. La skill `roadmap-generator` emite esta cabecera automáticamente cuando descompone una épica.
+
+**Filename obligatorio cuando se declara Sprint:** `NNN_sNN_<descriptor>.md` con sufijo `_sNN_` derivado del sprint. Ejemplo: si `> **Sprint:** 04`, el filename debe ser `145_s04_implement_oauth.md`. El hook `task-doc-validator.js` valida coherencia sufijo↔cabecera y emite `SPRINT_SUFFIX_MISMATCH` BLOCKER si discrepan o el sufijo está huérfano. Tareas atómicas (sin Sprint declarado) mantienen `NNN_<descriptor>.md` sin sufijo.
+
+**Ejemplos:**
+- `> **Sprint:** 03` (filename: `127_s03_setup_oauth.md`) — task pertenece a Sprint 03.
+- Omitir línea — task aislada (filename: `127_setup_oauth.md` sin sufijo).
+
+**Reglas:**
+- El sprint referenciado debe existir como `ai_docs/sprints/NN_*.md`.
+- La tabla §3 del sprint doc debe listar el ID de esta task (bidireccionalidad mecánica via `sprint-sync.js`).
+- Una task solo puede pertenecer a UN sprint (no soporta multi-sprint membership).
+- **Regla canónica de scope:** el task doc es la fuente de verdad del scope individual. Si sprint doc y task doc describen el scope de forma divergente → **task doc gana**; el sprint doc debe actualizarse. Ver `roadmap-generator/SKILL.md §"Regla canónica de scope"`.
+
+**Modo de creación según estado del sprint** (validado por plan-checker D7.6):
+- Sprint `ABIERTA` → CREATE permitido sin restricción.
+- Sprint `EN_PROGRESO` → CREATE permitido solo si la task pertenece a wave futura (W+1 respecto a la wave en ejecución). Wave ≤ wave en ejecución emite WARN advisory.
+- Sprint `COMPLETADA` → CREATE rechazado por plan-checker D7.6 BLOCKER; crear sprint nuevo con `Depende de:` cruzados a tasks del Sprint NN si aplica.
+
+**Lectura aguas abajo:**
+- `task-doc-validator.js` valida sufijo `_sNN_` en filename vs cabecera Sprint.
+- `plan-checker` Dimension 7 valida bidireccionalidad (D7.1-D7.5) + estado del sprint (D7.6) + topología de waves (D7.7) + overlap `files_touched` cross-task (D7.8).
+- `sprint-sync.js` valida bidireccionalidad + overlap `files_touched:` en tiempo de write/edit (advisory por defecto, opt-in).
+- `sprint-doc-validator.js` valida estructura del sprint doc al guardar (Estado único, tabla §3, DAG).
+
+**Cuándo usarla:** task fue emitida por `roadmap-generator` como parte de un sprint.
+**Cuándo NO usarla:** task aislada — no asociada a una épica. Mantener filename sin sufijo.
+
+### `> **Wave:** W` (opcional)
+
+Entero positivo. Declara la wave del DAG a la que pertenece esta task dentro del sprint. Permite a `sprint-sync.js` validar disjunción de `contract.files_touched` solo entre tasks de la misma wave (no entre waves distintas, que son secuenciales).
+
+**Ejemplo:** `> **Wave:** 2`
+
+**Cuándo usarla:** sprints con DAG de waves explícito (columna Wave en tabla §3 del sprint doc). Si ausente, sprint-sync asume que todas las tasks son Wave 1 (validación conservadora).
+
+---
 
 ### `> **Depende de:** NNN, NNN` (opcional)
 
@@ -182,13 +226,13 @@ El subagent `task-planner` produce este sub-bullet en el último paso de su work
 **Formato:**
 ```markdown
 - **Tamaño estimado:** [min]-[max] líneas en [N] archivos ([archivo1], [archivo2], ...).
-  [Si max > 400:] Por encima de 400 → recomendado split en sub-tareas con `> **Depende de:**` declarado (T079). En proyectos con skill `pr` desplegada, ver su sub-flow "Estrategia de stacking" (T081) para materializar la cadena (Stacked PRs to main vs Feature Branch Chain).
+  [Si max > 400:] Por encima de 400 → recomendado split en sub-tareas con `> **Depende de:**` declarado. En proyectos con skill `pr` desplegada, ver su sub-flow "Estrategia de stacking" para materializar la cadena (Stacked PRs to main vs Feature Branch Chain).
   [Si max > 800:] Por encima de 800 → considerar reclasificar como CRÍTICA.
 ```
 
 **Heurísticas:** edit puntual 5-20, sección nueva 30-100, archivo nuevo 100-300, refactor de módulo 200-500. Rangos amplios — no falsa precisión.
 
-**Lectura por plan-checker (T078):** Dimension 3 "Scope vs Forecast" lee este número y aplica umbral 400 — sin recalcular. Heurística en un solo sitio (matriz S2 de T076).
+**Lectura por plan-checker:** Dimension 3 "Scope vs Forecast" lee este número y aplica umbral 400 — sin recalcular. Heurística en un solo sitio.
 
 **Versionado en reaperturas:** si task-planner reabre el task doc tras `plan-checker` → BLOCKED, conservar el bullet previo como `Tamaño estimado [v1, fecha]:` y añadir nuevo `Tamaño estimado [v2, fecha]:`. Max 3 versiones; a la 4ª, escalar al usuario (sugiere replantear el alcance).
 
@@ -216,13 +260,15 @@ Cuando la tarea crea archivos nuevos (skill, hook, agent, command, template), de
 
 ### Plantillas de stack: herencia
 
-Las plantillas especializadas (`task_template_python.md`, `task_template_typescript.md`, etc.) **heredan esta sección "Cabecera de Metadatos del Task Doc (opcional)"** en bloque. No replican su contenido — referencian este archivo. Si una plantilla de stack necesita campos adicionales propios (ej: ADK requiere `> **Coverage de evals:** ...`), los documenta aparte sin duplicar los 3 anteriores.
+Las references especializadas (`references/task_template_python.md`, `references/task_template_typescript.md`, etc., cargadas por `task-planner` según stack detectado) **heredan esta sección "Cabecera de Metadatos del Task Doc (opcional)"** en bloque. No replican su contenido — referencian este archivo. Si una reference de stack necesita campos adicionales propios (ej: ADK requiere `> **Coverage de evals:** ...`), los documenta aparte sin duplicar los 3 anteriores.
 
 ---
 
 ### 0.0.6 — Triaje de Ingeniería (OBLIGATORIO para ESTÁNDAR+)
 
 <!-- AI Agent: Esta fase se ejecuta ANTES de crear el documento de tarea. Para tareas SIMPLE (<=2 archivos, sin decisiones de diseño), el triaje es mental — verificar rápidamente y pasar al Paso 0.1. Para ESTÁNDAR+, es conversación explícita con el usuario. -->
+
+> **T1 "Radio de impacto" es adaptable por stack.** Cada plantilla especializada redefine la unidad de análisis (componentes/server actions en TS; modelos/views/serializers en Django; agentes/state keys en ADK; etc.) sin cambiar la estructura T1/T2/T3.
 
 **Propósito:** Analizar la petición del usuario como ingeniero de software senior ANTES de documentar nada. Identificar el impacto real, los prerequisitos faltantes y los problemas de alcance que causan replanificación durante la implementación.
 
@@ -262,7 +308,6 @@ Fuera de alcance: [solo si hubo negociación en T2]
 
 ---
 
-<!-- SHARED-BLOCK: protocolo-creacion-v1 -->
 ### Paso 0.1: Verificar Estructura del Proyecto
 
 Confirmar que los directorios requeridos del proyecto existen antes de crear el documento de tarea.
@@ -456,7 +501,6 @@ Después de completar TODAS las fases, actualizar el documento de tarea con el e
 ```
 
 CRÍTICO: El archivo .md de tarea es la fuente única de verdad desde la creación hasta la finalización. Nunca crear archivos separados de resumen, reportes de finalización o documentos de estado.
-<!-- /SHARED-BLOCK -->
 
 ---
 
@@ -517,9 +561,30 @@ Agregar esta sección a cada documento de tarea que crees:
 - **Prerequisitos:** [lo que debe existir, con estado ✅/❌ — del análisis T1]
 
 ### Criterios de Éxito (medibles)
+
+<!-- EARS: usar sintaxis de observable outcome para criterios verificables por el plan-checker:
+     Ubiquitous: "El sistema DEBE <comportamiento observable>"
+     Event-driven: "Cuando <trigger>, el sistema DEBE <respuesta>"
+     State-driven: "Si el sistema está en <estado>, DEBE <comportamiento>"
+     Ejemplos buenos: "El endpoint DEBE retornar 201 con body { id }"; "Cuando el token expira, el sistema DEBE redirigir a /login"
+     Evitar: "funciona correctamente", "se integra bien", "el usuario puede X" (sin outcome verificable) -->
 - [ ] [Resultado específico y verificable 1]
 - [ ] [Resultado específico y verificable 2]
 - [ ] [Resultado específico y verificable 3]
+
+### Criterios de Calidad de Ingeniería (canónicos)
+
+> **Obligatorio si la task toca código ejecutable** (.js/.ts/.tsx/.jsx/.py/.php/.sh/.ps1/.go/.mjs/.cjs/archivos bajo `src/`, `app/`, `pages/api/`, `server/`, `.claude/{hooks,skills,agents}/`). Para tasks puramente documentales/config sin runtime, declarar excepción literal `Excepción a Criterios de Calidad de Ingeniería: task no toca código ejecutable (solo <docs/config>).` dentro del cuerpo de la sección "Riesgos aceptados", "Decisiones aceptadas" o "Riesgos y mitigaciones".
+
+- [ ] **Cleanup exhaustivo de comentarios:** archivos modificados sin comentarios narrativos del "qué hace el código", sin TODO/FIXME residual sin issue trackeado, sin código comentado. Verificable: `grep -nE "(TODO|FIXME|XXX)" <archivos>` retorna ≤ baseline previo + linter del stack sin reportar `no-warning-comments` / `commented-out-code` / equivalente. Comentarios permitidos solo cuando explican el WHY no obvio (constraint, invariant, workaround citado).
+
+- [ ] **Sin dead/legacy code:** sin variables/funciones/imports/exports declarados y nunca referenciados, sin código inalcanzable tras return/throw/break, sin feature flags muertos. Verificable: linter del stack (`ts-unused-exports`/`unimported` para TS, `vulture`/`pyflakes` para Python, `phpstan` para PHP, equivalente para Go) sin nuevos hallazgos en archivos modificados; `grep -r "<símbolo nuevo>"` confirma ≥1 caller (excepto APIs públicas declaradas).
+
+- [ ] **DRY/KISS/early returns aplicados:** sin bloques de 3+ líneas duplicados en archivos modificados (extraer o citar duplicación existente), sin abstracciones para 1 callsite, sin nesting innecesario donde un early return guard simplifica. Verificable: revisión humana o `reviewer` agent §9, con verdict explícito por archivo modificado.
+
+- [ ] **TDD reutilizando infra existente:** todo código nuevo/modificado tiene test(s) escritos junto al código (no después), reutilizando fixtures/helpers/utilities existentes en `tests/`, `__tests__/`, `spec/`, `conftest.py` o equivalente del stack. Verificable: archivo de test correspondiente existe con import desde la infra de tests del proyecto + kill-the-mutant pasa (comentar/invertir línea clave del cambio → al menos 1 test relevante falla). En L0 (sin framework), declarar como riesgo aceptado o invocar la skill `testing-setup` antes.
+
+**Defense-in-depth automático:** este bloque es validado por (1) hook `task-doc-validator.js` estructural BLOQUEANTE, (2) plan-checker D10 semántico BLOQUEANTE pre-impl, (3) `reviewer` agent §9 verdict 1:1 post-impl, (4) `task-implementation-review` §10 cruce final criterio↔implementación. El `task-planner` Paso 7.4 inyecta este bloque automáticamente al producir un task doc que toque código ejecutable.
 
 ### Restricciones Técnicas (si aplica)
 - [Restricción 1: Debe usar el sistema X existente]
@@ -528,7 +593,6 @@ Agregar esta sección a cada documento de tarea que crees:
 
 ---
 
-<!-- SHARED-BLOCK: alternativas-v1 -->
 ## 2. Analisis de Alternativas de Implementación
 
 **OBLIGATORIO para tareas ESTÁNDAR o superior. Para SIMPLE, documentar brevemente por que solo hay un enfoque viable.**
@@ -599,7 +663,6 @@ SOLUCIÓN RECOMENDADA: Alternativa [X] - [Nombre de la Solución]
 ### DECISIÓN DEL USUARIO REQUERIDA
 
 Presentar las alternativas al usuario con la recomendación. **Esperar aprobación antes de proceder con las secciones de implementación.**
-<!-- /SHARED-BLOCK -->
 
 ---
 
@@ -736,19 +799,9 @@ Antes de presentar el documento de tarea para aprobación, proporcionar una visi
 **Tipo de Cambio**: [Archivo Nuevo / Refactorización Mayor / Actualización Menor / Eliminación]
 **Líneas**: [Conteo actual] -> [Conteo nuevo] (+X/-Y líneas)
 
-**Implementación Actual** (solo secciones clave):
-```
-// Mostrar 5-10 líneas del código actual crítico
-// Enfocarse en las partes que se modifican
-```
+**Implementación Actual** (resumen conceptual de las secciones críticas que se modifican). NO pegar bloques de código pre-escritos como plantilla — el implementer infiere el código del Plan + contexto del repo. Describir el comportamiento actual en prosa breve por archivo/módulo.
 
-**Cambios Propuestos**:
-```
-// Mostrar las mismas secciones con cambios
-// CHANGED: explicación
-// ADDED: explicación
-// REMOVED: explicación
-```
+**Cambios Propuestos**: descripción conceptual del delta esperado por archivo/módulo. **NO usar comentarios-plantilla tipo `// CHANGED:` `// ADDED:` `// REMOVED:`** — el implementer escribe el código real durante implementación, no se le suministra pseudo-código pre-formateado que pueda copiar literalmente. La task doc describe el contrato (qué cambia, por qué y dónde), no el código exacto.
 
 **Impacto**:
 - Funcionalidad: [Qué comportamiento cambia]
@@ -832,48 +885,14 @@ REGLA: Si "Listo para Proceder" = NO, NO solicitar aprobación del usuario. Reso
   - Archivos: [rutas]
   - **Listo Cuando**: [Criterio de finalización medible]
 
-### Fase 4: Validación Básica de Código (Solo AI)
-**Objetivo:** Ejecutar solo análisis estático seguro -- NUNCA ejecutar servidor de desarrollo, build o comandos de aplicación
+### Cierre de implementación
 
-- [ ] **Tarea 4.1:** Verificación de Calidad de Código
-  - Ejecutar linting y análisis estático SOLAMENTE
-- [ ] **Tarea 4.2:** Revisión de Lógica Estática
-  - Leer código para verificar lógica de sintaxis, manejo de casos extremos, patrones de respaldo
-- [ ] **Tarea 4.3:** Verificación de Contenido de Archivos (si aplica)
-  - Leer archivos para verificar estructura de datos, corrección de configuración (SIN llamadas a base de datos/API en vivo)
+Tras completar todas las fases del Plan, el `implementer` ejecuta su Paso 3 "Validación local" (type check + lint + tests del módulo tocado) y encadena al `reviewer` agent.
 
-PUNTO DE CONTROL CRÍTICO DEL FLUJO DE TRABAJO: Después de la Fase 4, presentar el mensaje "¡Implementación Completa!" (Sección 16, Paso 6), esperar aprobación del usuario, luego ejecutar revisión comprensiva de código. NUNCA proceder a pruebas del usuario sin completar la revisión de código.
-
-### Fase 5: Revisión Comprensiva de Código (Obligatoria)
-
-- [ ] **Tarea 5.1:** Presentar "¡Implementación Completa!" y esperar aprobación del usuario
-- [ ] **Tarea 5.2:** Ejecutar Revisión de Código (si se aprueba):
-
-**Checklist de Revisión (TODOS obligatorios):**
-
-1. **Requisitos** — Mapear cada criterio de éxito a su implementación (archivo:línea). Si alguno NO CUMPLIDO → DETENER.
-2. **Linting y tipos** — Ejecutar herramientas del stack (eslint/ruff/etc + tsc/mypy/etc). 0 NUEVOS errores introducidos por los cambios (errores preexistentes fuera de alcance).
-3. **Code smells** — Buscar EN ARCHIVOS MODIFICADOS: TODO/FIXME, console.log/print, código comentado, imports no usados. Reportar hallazgos; NO eliminar sin confirmación del usuario.
-4. **DRY** — En archivos modificados, verificar que no se duplica lógica ya existente en el codebase. Si se encuentra duplicación → reportar al usuario con propuesta de extracción; NO extraer automáticamente.
-5. **KISS** — ¿Es la implementación más simple que satisface los criterios? Complejidad adicional requiere justificación explícita.
-6. **Separación de responsabilidades** — Validación, lógica de negocio y acceso a datos en capas separadas. Sin lógica de negocio en controllers/views. Sin queries en capa de presentación.
-7. **Seguridad** — Validación de inputs en servidor, sin SQL/XSS/injection, permisos verificados, sin secretos hardcoded.
-8. **Integración** — Listar callers/importers de las funciones/módulos modificados (todos los que existan, sin mínimo artificial) → verificar que cada uno sigue compilando. Firmas de funciones compatibles. Sin dependencias circulares.
-9. **Regresión** — Ejecutar suite de tests COMPLETA (no solo tests "related"). Resultado: X/Y tests pasan. Si no hay tests para código modificado, documentar como riesgo.
-10. **Arquitectura** — Patrones de acceso a datos siguen convenciones del proyecto. Sin violaciones de límites.
-11. **Migración de BD** (si aplica) — Rollback existe ANTES de aplicar. Operaciones seguras (IF EXISTS, etc).
-12. **Accesibilidad** (si cambios frontend) — Contraste suficiente, alt text en imágenes, navegación por teclado funcional, aria labels donde corresponda.
-13. **Dependencias** — `npm audit` / `pip-audit` / `composer audit` sin vulnerabilidades críticas introducidas por el cambio.
-
-**Baseline de deuda técnica y rendimiento (ESTÁNDAR+):** Registrar al inicio y al final: errores de lint, errores de tipos, cobertura de tests (si existe), tiempos de respuesta y conteo de queries en rutas afectadas. El cambio no debe empeorar métricas significativamente: lint/tipos (+0 nuevos), coverage (tolerancia -2%), response time (tolerancia +10% en rutas modificadas). Métricas preexistentes fuera de alcance.
-
-**Veredicto:** APROBADO (0 problemas) / CONDICIONAL (problemas menores) / RECHAZADO (problemas críticos → REPORTAR al usuario con propuesta de corrección; NO corregir automáticamente sin aprobación)
-
-### Fase 6: Pruebas del Usuario (Solo Después de Revisión de Código)
-
-- [ ] **Tarea 6.1:** Presentar Resultados de Pruebas AI
-- [ ] **Tarea 6.2:** Solicitar Pruebas del Usuario con checklist específico
-- [ ] **Tarea 6.3:** Esperar Confirmación del Usuario
+**División de responsabilidades:**
+- **`implementer`** aplica P2 (minimum code) + P3 (touch only what you must) durante implementación. NO ejecuta DRY/KISS/SoC/Seguridad/Integración/Regresión/Arquitectura/Accesibilidad/Dependencias.
+- **`reviewer`** (Opus, correlacionado en un solo pase, NUNCA fragmentar): §2 DRY + §3 KISS + §4 Dead code + §5 SoC + §6 Seguridad + §7 Testing + §8 Integración + §9 Engineering Hygiene Verdict, todo con archivo:línea.
+- **`task-implementation-review`** §10 Engineering Hygiene 1:1: cruza criterios canónicos del task doc contra evidencia citable en el diff.
 
 ---
 
@@ -881,38 +900,34 @@ PUNTO DE CONTROL CRÍTICO DEL FLUJO DE TRABAJO: Después de la Fase 4, presentar
 
 ---
 
-<!-- SHARED-BLOCK: edge-cases-v1 -->
-## 14. Analisis de Modos de Falla y Casos Extremos
+## 14. Casos límite mínimos (obligatorio)
 
-**OBLIGATORIO para tareas ESTÁNDAR o superior. Para SIMPLE, omitir esta sección.**
+**OBLIGATORIO para todas las complejidades (SIMPLE, ESTÁNDAR, COMPLEJA, CRÍTICA).** La sección debe tener ≥3 entradas concretas con respuesta esperada — no checkboxes vacíos. plan-checker Dimension 8 BLOQUEA si artifact ejecutable nuevo carece de esta sección o tiene <3 entradas concretas.
 
-### Escenarios de Error a Analizar
-- [ ] **Escenario de Error 1:** [Qué podría salir mal]
-  - **Foco de Revisión de Código:** [Qué archivos/funciones examinar]
-  - **Corrección Potencial:** [Enfoque sugerido]
-- [ ] **Escenario de Error 2:** [Otro punto potencial de falla]
-  - **Foco de Revisión de Código:** [Dónde buscar]
-  - **Corrección Potencial:** [Solución recomendada]
+### Las 3 preguntas mínimas (responder concretamente)
 
-### Preguntas Obligatorias de Edge Cases
+- **Input vacío / null / no existente:** ¿Qué pasa cuando se invoca con input vacío, null, archivo inexistente, o estado pre-condición ausente?
+  **Respuesta esperada:** _[describir comportamiento concreto: rechazo explícito, valor por defecto, error tipado, etc.]_
 
-- [ ] **Inputs vacios/nulos**: Que pasa si el usuario envia datos vacios, campos nulos, strings vacios?
-- [ ] **Escala**: Que pasa con 10x el volumen actual de datos? Las operaciones son eficientes?
-- [ ] **Concurrencia**: Que pasa si dos usuarios modifican el mismo recurso simultaneamente?
-- [ ] **Dependencias externas**: Que pasa si la base de datos esta lenta, un servicio externo no responde, o una API falla?
-- [ ] **Estado inconsistente**: Que pasa si una operación multi-paso falla a la mitad? Hay rollback?
-- [ ] **Seguridad**: Se validan inputs en el servidor? Se verifican permisos? Hay inyeccion posible?
-- [ ] **Permisos**: Diferentes roles de usuario ven/hacen lo correcto?
-- [ ] **Migracion de datos**: Si hay cambios en BD, que pasa con datos existentes?
-- [ ] **Limites de sistema**: Que pasa con archivos grandes, timeouts, o limites de memoria?
+- **Fallo de dependencia externa:** ¿Qué pasa si una dependencia (DB, archivo, API, hook upstream, servicio remoto) falla con timeout, código de error, archivo ausente, o respuesta malformada?
+  **Respuesta esperada:** _[describir degradación o error tipado: retry/circuit-breaker/fail-fast/fallback]_
 
-### Fallas Criticas (Alto Impacto + Alta Probabilidad)
-- [Listar las que requieren mitigacion obligatoria]
+- **Estado tras error parcial:** ¿Qué pasa si el cambio se aplica parcialmente (interrupción, race condition, fallo a mitad de transacción)? ¿Hay rollback? ¿Idempotencia? ¿Compensación?
+  **Respuesta esperada:** _[describir comportamiento de recovery: transacción, idempotencia natural, rollback manual, compensación]_
+
+### Preguntas adicionales (ESTÁNDAR o superior)
+
+Para tareas ESTÁNDAR+, ampliar con preguntas específicas según el tipo de artifact creado/modificado. Ver **`references/edge-cases-catalog.md`** para preguntas calibradas a hook, skill, agent, command, endpoint, server-action, migration, schema.
+
+Esta sección sustituye las 9 preguntas-checkbox genéricas previas (`edge-cases-v1`) — el formato Q + Respuesta esperada fuerza reflexión concreta, no checkbox-marking.
+
+### Fallas Críticas (Alto Impacto + Alta Probabilidad)
+_[Listar las que requieren mitigación obligatoria — concretas, no genéricas]_
 
 ### Riesgos Aceptados (Bajo Impacto o Baja Probabilidad)
-- [Listar con justificación]
+_[Listar con justificación explícita — la declaración convierte la asunción en consciente, plan-checker D8 no flagea como BLOCKER]_
 
-### Revisión de Seguridad y Control de Acceso
+### Revisión de Seguridad y Control de Acceso (cuando aplique)
 - [ ] **Control de Acceso de Administrador:** ¿Las funcionalidades solo de administrador están correctamente restringidas?
 - [ ] **Estado de Autenticación:** ¿El sistema maneja apropiadamente los usuarios sin sesión?
 - [ ] **Validación de Entrada de Formularios:** ¿Las entradas se validan del lado del cliente y del servidor?
@@ -925,11 +940,9 @@ Revisar código existente para identificar puntos de falla y brechas de segurida
 1. CRÍTICO: Problemas de seguridad y control de acceso
 2. IMPORTANTE: Escenarios de error y casos extremos visibles al usuario
 3. DESEABLE: Mejoras de UX y mensajes de error mejorados
-<!-- /SHARED-BLOCK -->
 
 ---
 
-<!-- SHARED-BLOCK: rollback-v1 -->
 ## 14B. Estrategia de Rollback (OBLIGATORIO para COMPLEJA/CRÍTICA)
 
 Cada tarea COMPLEJA o CRÍTICA DEBE incluir un plan de rollback:
@@ -954,13 +967,11 @@ Cada tarea COMPLEJA o CRÍTICA DEBE incluir un plan de rollback:
 - **Tiempo estimado de rollback:** [Minutos/horas]
 - **Datos en riesgo:** [Que datos podrian perderse]
 - **Verificación post-rollback:** [Como confirmar éxito]
-<!-- /SHARED-BLOCK -->
 
 ---
 
 ---
 
-<!-- SHARED-BLOCK: puerta-pre-impl-v2 -->
 ## PUERTA PRE-IMPLEMENTACIÓN (OBLIGATORIO)
 
 Antes de iniciar cualquier implementación, TODOS los checkboxes deben estar marcados:
@@ -977,11 +988,9 @@ Antes de iniciar cualquier implementación, TODOS los checkboxes deben estar mar
 - [ ] Documento presentado y aprobado por usuario
 
 → Si CUALQUIER checkbox sin marcar: DETENER. No implementar.
-<!-- /SHARED-BLOCK -->
 
 ---
 
-<!-- SHARED-BLOCK: instrucciones-agente-v3 -->
 ## Instrucciones para el Agente de IA
 
 **Rol: Ingeniero de Software Senior, no documentador.**
@@ -1034,7 +1043,6 @@ Tras todas las fases: cambiar estado a `Pending Review` → ejecutar checklist d
 **APROBADO**: "ejecuta", "adelante", "aprobado", "proceder", "se ve bien"
 **NO APROBADO**: "interesante", "ya veo", preguntas sobre el plan, silencio
 **AMBIGUO**: "ok", "vale", "claro" → confirmar antes de proceder
-<!-- /SHARED-BLOCK -->
 
 ---
 
@@ -1137,7 +1145,7 @@ Después de crear el documento de tarea, usar la skill de codificación apropiad
 
 ---
 
-## 20. Bloque `contract:` opcional (T087)
+## 20. Bloque `contract:` opcional
 
 Para tareas ESTÁNDAR+ con `depends_on:` declarado o handoffs explícitos entre subagents, añadir al final del task doc un bloque YAML que formaliza los campos críticos para parsing mecánico:
 
@@ -1153,15 +1161,86 @@ contract:
     files_created: 0
   wiring:
     - "ruta/al/archivo (creado|modificado)"
+  files_touched: []              # Opcional. Lista de paths relativos al repo que esta task modifica. Usado por sprint-sync para detectar overlap entre tasks de la misma wave. Ejemplo: ["claude-templates/commands/setup_project.md", "claude-templates/hooks/sprint-sync.js"]
+  parallelizable_phases:        # Opcional. Lista de waves; cada wave es lista de fases disjuntas.
+    - [1, 2]                    # Wave 1: Fase 1 y 2 corren en paralelo (módulos disjuntos en archivos)
+    - [3]                       # Wave 2: Fase 3 sola (depende de las anteriores)
+    - [4, 5]                    # Wave 3: Fase 4 y 5 corren en paralelo
   produced_by: "task-planner"
   validated_by: ["plan-checker"]
   consumed_by: ["implementer", "reviewer", "doc-syncer"]
 ````
 
-**Opcional.** Si ausente, plan-checker y demás agents leen las cabeceras blockquote (`> **Depende de:**`, `> **Asunciones:**`) y los sub-bullets ("Tamaño estimado", "Wiring esperado") como hasta T086. Ver detalle del schema en `CLAUDE.md` raíz §3.2 "Bloque `contract:` opcional (T087)".
+**Opcional.** Si ausente, plan-checker y demás agents leen las cabeceras blockquote (`> **Depende de:**`, `> **Asunciones:**`) y los sub-bullets ("Tamaño estimado", "Wiring esperado") como fallback. Ver detalle del schema en `CLAUDE.md` raíz §3.2 "Bloque `contract:` opcional".
+
+### Campo `parallelizable_phases:` (opcional)
+
+Permite paralelización fractal: dentro de una task, las fases declaradas como disjuntas se lanzan en paralelo (`task-planner` Paso 0.7 ampliado lee este campo y delega N implementers paralelos por wave de fases, no solo por task).
+
+**Formato:** lista de listas. Cada lista interna es una **wave de fases** que corren en paralelo. Las waves externas se ejecutan en orden secuencial.
+
+**Ejemplo (3 waves):**
+```yaml
+parallelizable_phases:
+  - [1, 2]    # Wave 1 — 2 implementers paralelos (Fase 1 + Fase 2)
+  - [3]       # Wave 2 — 1 implementer (Fase 3, depende de waves anteriores)
+  - [4, 5]    # Wave 3 — 2 implementers paralelos (Fase 4 + Fase 5)
+```
+
+**Cuándo usarlo:** complejidad ESTÁNDAR+ con ≥3 fases y al menos 2 fases con módulos disjuntos (no comparten archivos ni dependencias transitivas).
+
+**Cuándo NO usarlo:** SIMPLE (1 fase), o tareas con fases secuenciales por contrato lógico (ej: schema → migration → rollback verification, donde cada paso depende del anterior).
+
+**Ausencia del campo:** orden literal de fases, ejecución serial. Cero breaking change para task docs antiguos.
+
+**Lectura por `task-planner` Paso 0.7:** parsea el campo cuando delega a implementer; lanza N implementers en paralelo por wave; espera cierre de la wave antes de pasar a la siguiente; tras última wave → reviewer correlacionado (NO fragmentar).
+
+**Coherencia con `Depende de:`** (cabecera blockquote): el `Depende de:` opera entre tasks distintas (waves del DAG del sprint); `parallelizable_phases:` opera entre fases dentro de UNA task. Son dimensiones ortogonales: una task con sprint puede declarar ambas.
+
+**Nota imperativa:** si declaras `parallelizable_phases:` con waves internas de >1 fase, el orquestador (main session) DEBE lanzar N implementers paralelos por wave en una sola respuesta. Serializar lo declarado paralelo es violación reportada por:
+
+- `implementer-agent` Paso 1 → `[CONFIG ERROR]` si recibe prompt sin estructura wave/fase.
+- `implementer-agent` Paso 4 → `[VIOLATION]` al cierre si confirmó la degradación.
+- `reviewer` correlacionado al final → `[VIOLATION]` agregado si detecta N=1 reports pese a contract declarando ≥2 fases en alguna wave interna.
+
+Reportes informativos, NO bloquean. Si tu task tiene tests del código de una fase anterior, declara wave separada: `[[1, 2], [3]]` (Fases 1+2 paralelas, Fase 3 tests serial post). Plan-checker D9 valida disjunción semántica leyendo el Plan de Implementación. Regla canónica completa en `CLAUDE.md.template` §"Cuándo delegar" / "Paralelización" — single source of truth.
+
+**Extensión futura (no implementada):** campo opcional `parallelizable_phases_files:` (mapa fase → paths) que permitiría a plan-checker D9 validar disjunción **mecánicamente** (sin LLM). Schema propuesto:
+
+```yaml
+parallelizable_phases:
+  - [1, 2]
+  - [3]
+parallelizable_phases_files:    # opcional, propuesta futura
+  1: ["src/auth.ts", "src/auth.test.ts"]
+  2: ["src/billing.ts"]
+  3: ["docs/auth.md"]
+```
+
+Hoy D9 lee el "Plan de Implementación" para inferir archivos por fase. La extensión mecánica queda para una futura task.
 
 ---
 
-*Versión de Plantilla: 4.0 - Triaje de Ingeniería + Patrones Modernos*
-*Última Actualización: 2026-05-05*
-*Creado Por: Brandon Hancock*
+## Catálogo de edge cases por tipo de artifact
+
+El catálogo completo (Hook, Skill, Agent, Command, Endpoint, Server Action, Migration, Schema) vive en `references/edge-cases-catalog.md`. El `task-planner` Paso 7.3 referencia ese catálogo cuando la task crea o modifica un artifact tipado.
+
+---
+
+## Estado y Versiones
+
+> Bloque obligatorio en todos los task docs ESTÁNDAR+. El implementer rellena `started_at` al inicio de su turno (Paso 0). El reviewer rellena `completed_at` y `status: approved` solo si aprueba.
+
+| Campo | Valor | Quién |
+|---|---|---|
+| `created_at` | <!-- ISO 8601 --> | task-planner |
+| `started_at` | <!-- ISO 8601 → implementer lo rellena al iniciar --> | implementer |
+| `completed_at` | <!-- ISO 8601 → solo si reviewer aprueba --> | reviewer |
+| `version` | `v1` | reviewer (+1 por ciclo impl→review→vuelta) |
+| `review_iteration` | `0` | reviewer (+1 cada CORREGIR Y RE-REVISAR; cap 2 → escalar al usuario) |
+| `last_modified_by` | <!-- agente — propósito --> | cada agente |
+| `status` | `pending` | task-planner al crear |
+
+**Ciclo de status:** `pending` → `in_progress` (implementer inicia) → `in_review` (implementer cierra) → `approved` (reviewer aprueba) → `done` (doc-syncer confirma criterios).
+
+*Versión de Plantilla: 4.2*

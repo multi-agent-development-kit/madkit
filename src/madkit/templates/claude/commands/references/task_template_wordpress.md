@@ -6,7 +6,7 @@
 **PHP Minimo:** 8.2+
 **Complejidad Estimada:** [Simple / Estándar / Compleja / Crítica]
 
-> **Cabecera de Metadatos opcional (T079):** los task docs pueden incluir cabecera blockquote con `> **Depende de:**`, `> **Asunciones:**` y sub-sección "Wiring esperado" para el flujo `task-planner` Paso 0.6 (waves). Ver documentación completa en [`task_template.md`](task_template.md) §"Cabecera de Metadatos del Task Doc (opcional)" — esta plantilla hereda esa especificación.
+> **Cabecera de Metadatos opcional:** los task docs pueden incluir cabecera blockquote con `> **Depende de:**`, `> **Asunciones:**` y sub-sección "Wiring esperado" para el flujo `task-planner` Paso 0.6 (waves).
 
 ---
 
@@ -83,165 +83,33 @@
 
 ### 0.0.6 — Triaje de Ingeniería (OBLIGATORIO para ESTÁNDAR+)
 
-<!-- AI Agent: Para tareas SIMPLE (<=2 archivos), el triaje es mental. Para ESTÁNDAR+, es conversación explícita con el usuario. -->
+**T1 — Radio de impacto (delta WordPress):**
 
-**T1: Analizar** — Examinar el codebase para responder:
+- Unidad de análisis: **archivos PHP, templates, hooks, shortcodes, CPTs (Custom Post Types), bloques Gutenberg, plugins/themes**.
+- Prerequisitos típicos: theme activo correcto · plugins necesarios activos · versión WP compatible (6.8+) · PHP 8.2+ · APIs modernas disponibles (Block Bindings, Interactivity).
+- Integración: hooks/filtros nativos de WordPress · patrones del theme/plugin establecidos · ¿plugin o `functions.php`? · ¿hook existente o custom? · ¿shortcode o bloque Gutenberg?
+- Decisiones stack-specific en T2: existe hook/filtro nativo → proponerlo · plugins faltantes → resolverlos primero · sobre-diseño con metabox cuando Block Bindings basta.
 
-- **Radio de impacto:** ¿Cuántos archivos PHP, templates, hooks, shortcodes, CPTs se ven afectados?
-  - <=2 archivos en 1 plugin/theme → SIMPLE
-  - 3-6 archivos en 1-2 plugins → ESTÁNDAR
-  - 6+ archivos o 3+ plugins/themes → COMPLEJA
-  - Core modifications, datos producción, prerequisitos bloqueantes → CRÍTICA
-- **Prerequisitos:** ¿Theme activo correcto? ¿Plugins necesarios activos? ¿Versión WP compatible? Trazar dependencias (max 2 niveles). ✅ existe | ❌ falta.
-- **Integración:** ¿Hay hooks/filtros nativos de WordPress que resuelven esto? ¿Patrones del theme/plugin establecidos?
-- **Stack-specific:** ¿Plugin o functions.php? ¿Hook existente o custom? ¿Shortcode o bloque Gutenberg? Verificar antes de planificar.
+**Tabla de complejidad (común a todos los stacks, con ajuste WordPress):**
 
-**T2: Cuestionar (solo si hay razón):**
+| Radio | Complejidad |
+|---|---|
+| ≤2 archivos en 1 plugin/theme | SIMPLE |
+| 3-6 archivos en 1-2 plugins | ESTÁNDAR |
+| 6+ archivos o 3+ plugins/themes | COMPLEJA |
+| Modificaciones al core / datos producción / prerequisitos bloqueantes | CRÍTICA |
 
-- Alcance cubre 2+ funcionalidades independientes → proponer desglose
-- Existe hook/filtro nativo de WordPress → proponerlo en lugar de código custom
-- Prerequisitos bloqueantes (plugins faltantes, versión WP) → proponer resolverlos primero
-- Sobre-diseño detectado → proponer simplificación (KISS)
-
-**T3: Alinear** — Para ESTÁNDAR+, presentar al usuario:
-
-```
-Alcance: [1-2 frases]
-Complejidad: [nivel] — [N archivos, M plugins]
-Prerequisitos: [lista si hay] / Ninguno detectado
-¿Confirmas este alcance para crear el documento de tarea?
-```
-
-**PUNTO DE ESPERA:** Para ESTÁNDAR+, esperar confirmación antes de proceder.
-
-### Paso 0.1: Verificar Estructura del Proyecto
-
-Confirmar que la estructura de documentación requerida existe.
-
-- Verificar que el directorio `ai_docs/` existe
-- Verificar que el subdirectorio `ai_docs/tasks/` existe
-
-**Si no se encuentra:** DETENER y preguntar al usuario: "No veo un directorio `ai_docs/`. ¿Debería crearlo?"
+**Punto de espera T3:** SIMPLE → integrado con presentación final. ESTÁNDAR+ → punto de espera explícito antes de crear documento.
 
 ---
 
-### Paso 0.2: Verificar Documento de Tarea Activa
+### Pasos 0.1–0.7 — Gestión del documento de tarea
 
-**Antes de crear una nueva tarea, verificar si ya existe una para este trabajo:**
+**Delta WordPress:**
 
-1. Listar archivos en `ai_docs/tasks/` y buscar un documento relacionado con la solicitud actual
-2. Si el usuario pide correcciones/revisiones de trabajo anterior → encontrar y ACTUALIZAR ese documento
-3. Si el usuario pide continuar implementación → encontrar y ACTUALIZAR ese documento
-4. **Solo crear un nuevo número de tarea si es trabajo genuinamente NUEVO sin documento existente**
-
-**Si se encuentra tarea activa:** Saltar al Paso 0.5 y trabajar sobre el documento existente.
-
----
-
-### Paso 0.3: Detectar Siguiente Número de Tarea
-
-**Solo si el Paso 0.2 confirmó que no aplica ninguna tarea existente:**
-
-1. Listar archivos en `ai_docs/tasks/`
-2. Extraer el prefijo de 3 dígitos de CADA nombre de archivo
-3. Encontrar el número más alto entre TODOS los archivos
-4. Sumar 1 y formatear con 3 dígitos
-5. Si no existen archivos: usar 001
-
-**Reglas:** Secuencia global compartida, siempre 3 dígitos, cada número se usa EXACTAMENTE UNA VEZ. El número `000` está RESERVADO para calibración del proyecto — nunca usar para tareas normales.
-
----
-
-### Paso 0.4: Crear Documento de Tarea
-
-**CRÍTICO: UNA tarea = UN archivo. UN número = UN archivo. Sin excepciones.**
-
-**Convención de Nombres para WordPress:**
-- **Formato:** `XXX_camelCaseName.md`
-- **Convención:** camelCase (WordPress)
-- **Ubicación:** `ai_docs/tasks/XXX_camelCaseName.md`
-- **Verificar:** NO exista un archivo con ese prefijo de número
-
----
-
-### Paso 0.5: Presentar Documento de Tarea al Usuario
-
-**NOTA:** El análisis crítico de impacto, prerequisitos y alcance ya se realizó en el Triaje de Ingeniería (Paso 0.0.6). Aquí se presenta el documento ya validado.
-
-**Verificación rápida antes de presentar:**
-- ¿El documento refleja el alcance validado en T3? Si no → actualizar.
-- ¿Se descubrió algo nuevo durante el análisis? Si sí → comunicar como observación.
-
-**Después de completar el triaje, presentar estas 3 opciones:**
-
-```
-Documento de Tarea Creado: `ai_docs/tasks/XXX_camelCaseName.md`
-
-**Resumen del Enfoque Planificado:**
-[Breve resumen de 2-3 oraciones]
-
-[Solo si se descubrió algo nuevo:]
-**Observaciones y Sugerencias del Asistente:**
-Tras analizar la tarea y el codebase, he identificado lo siguiente:
-
-1. **[Categoría]:** [Observación o sugerencia concreta]
-2. **[Categoría]:** [Observación o sugerencia concreta]
-3. **[Categoría]:** [Observación o sugerencia concreta — si aplica]
-
-> Categorías válidas: Dependencia detectada | Prerequisito | Alternativa de enfoque | Optimización | Riesgo identificado | Ajuste de alcance | Refactorización recomendada
-
-**¿Cómo deseas proceder?**
-
-**A) Vista Previa de Cambios de Código Detallados**
-**B) Aprobar e Iniciar Implementación**
-**C) Modificar o Iterar sobre el Plan**
-Ajustar el enfoque, explorar las sugerencias, o refinar el plan antes de comprometerse.
-```
-
-**PUNTO DE ESPERA OBLIGATORIO:** DETENERSE y esperar elección explícita del usuario.
-
-**NOTA SOBRE ITERACIÓN:** La iteración es el proceso normal. Las tareas raramente están perfectas en la primera versión. Si el usuario elige C, actualizar el documento existente, incorporar el feedback, y re-presentar con nuevas sugerencias basadas en la conversación.
-
----
-
-### Paso 0.6: Manejar Retroalimentación del Usuario
-
-**Si el usuario elige Opción C (Modificar) o solicita cambios:**
-- Actualizar el documento de tarea EXISTENTE — NO crear nuevos archivos
-- NO crear nuevas versiones (`_v2`, `_updated`, etc.)
-
----
-
-### Paso 0.7: Actualizaciones de Fase de Implementación
-
-**Cuando el usuario aprueba (Opción B) y la implementación comienza:**
-- Documentar progreso en el documento de tarea EXISTENTE agregando/actualizando una sección `## Progreso`
-- NO modificar plantillas en `.claude/commands/`
-
-#### Regla de Alcance Estricto (ACTIVA durante toda la implementación)
-
-> OBLIGATORIO: Solo modificar código directamente relacionado con la sección "Incluye".
-
-- Si se descubre un problema FUERA del alcance:
-  1. **NO arreglarlo** — documentarlo como nota en "Descubrimientos fuera de alcance" del task document
-  2. Si es BLOQUEANTE para la tarea actual: PAUSAR, informar al usuario, esperar decisión
-  3. Si NO es bloqueante: ignorarlo completamente
-- **Test rápido:** ¿Este cambio está en "Incluye"? → SI: proceder. NO: no tocarlo.
-- **Excepción única:** errores de sintaxis/compilación en líneas que YA se están modificando
-- **Prohibido:** arreglar warnings, code smells, o deuda técnica encontrada "de paso"
-
-**Convención de Nomenclatura:** `XXX_camelCaseName.md` (camelCase para proyectos WordPress)
-
-**Agregar sección de seguimiento:**
-```markdown
-## Seguimiento del Ciclo de Vida de Tarea
-### Creación
-- **Creado:** [timestamp]
-- **Creado Por:** task_template_wordpress.md
-- **Complejidad Inicial:** [Simple | Estándar | Compleja | Crítica]
-### Revisiones / Progreso de Implementación / Estado de Finalización
-[Actualizar durante ciclo de vida]
-```
+- **Paso 0.4 — Convención de nombres:** `XXX_camelCaseName.md` (camelCase WordPress). Ubicación: `ai_docs/tasks/XXX_camelCaseName.md`.
+- **Paso 0.5 — Verificación rápida antes de presentar:** ¿La verificación de APIs modernas (PASO 0.1) reveló que el enfoque planificado se puede simplificar con APIs nuevas (Block Bindings, Interactivity, Commands)? Si sí → comunicar como observación.
+- **Paso 0.7 — Cabecera de seguimiento:** `Creado Por: task_template_wordpress.md`.
 
 ---
 
@@ -1129,7 +997,7 @@ do_action( 'qm/debug', $variable );  // Con Query Monitor
 - [ ] Nombres descriptivos para variables y funciones
 - [ ] Sin código muerto comentado en archivos modificados (reportar hallazgos, no eliminar sin confirmación)
 - [ ] Sin TODOs sin resolver en archivos modificados (TODOs preexistentes fuera de alcance)
-- [ ] DRY en archivos modificados (si se detecta duplicación → reportar, no extraer automáticamente)
+- [ ] DRY: responsabilidad del `reviewer` agent §2 post-impl; el implementer no extrae duplicación proactivamente, solo reporta si la encuentra en archivos modificados
 
 **Documentacion:**
 ```php
@@ -1204,78 +1072,27 @@ $args = array(
 
 ## PUERTA PRE-IMPLEMENTACIÓN (OBLIGATORIO)
 
-Antes de iniciar cualquier implementación, TODOS los checkboxes deben estar marcados:
-
-- [ ] Triaje de Ingeniería completado — alcance validado con usuario (ESTÁNDAR+)
-- [ ] Prerequisitos verificados — todos existen o tienen tarea separada
-- [ ] Complejidad clasificada (SIMPLE / ESTÁNDAR / COMPLEJA / CRÍTICA)
-- [ ] Pre-flight completado sin errores (PASO 0.1)
-- [ ] Archivos afectados identificados
-- [ ] Alternativas evaluadas (ESTÁNDAR+, PASO 0B)
-- [ ] Casos extremos analizados (ESTÁNDAR+, PASO 0C)
-- [ ] Rollback documentado (COMPLEJA/CRÍTICA, PASO 0D)
-- [ ] Checklist de seguridad completado (PASO 3)
-- [ ] Criterios de éxito medibles definidos
-- [ ] Documento presentado y aprobado por usuario
-
-→ Si CUALQUIER checkbox sin marcar: DETENER. No implementar.
+**Delta WordPress (añadir checkbox):**
+- `[ ] Checklist de seguridad WordPress completado (PASO 3)` — verificación específica de nonces, capabilities, sanitización, escapado.
 
 ---
 
-<!-- SHARED-BLOCK: instrucciones-agente-v3 -->
 ## Instrucciones para el Agente de IA
 
-**Rol: Ingeniero de Software Senior, no documentador.**
+Ver sección canónica en `task_template.md` §"Instrucciones canónicas para el Agente de IA". Deltas específicos de WordPress:
 
-El asistente NO acepta la petición del usuario sin análisis. ANTES de crear cualquier documento de tarea, ejecutar el Triaje de Ingeniería (Paso 0.0.6): analizar impacto, trazar prerequisitos, evaluar alcance.
+- **Triaje API target:** distinguir Block Editor (Gutenberg) vs Classic Editor; REST API custom endpoints vs WP-JSON built-in; impacta el enfoque de implementación.
+- **Hooks y capabilities:** mapear hooks de acción/filtro afectados; verificar `current_user_can()` y nonces en todas las operaciones que muten datos.
+- **Pre-flight:** verificar versión WP, theme activo y plugins que puedan interferir (especialmente constructores de página o frameworks de seguridad).
 
-### Disciplina de Alcance (OBLIGATORIO)
+---
 
-> Complementa la "Regla de Alcance Estricto" del Paso 0.6 con principios de decisión.
+## Acciones Prohibidas y Documento Único
 
-- **Decisiones intencionales:** Asumir que código existente fuera del alcance refleja decisiones de negocio válidas. No sugerir cambios a código funcional que no está en el scope.
-- **Auto-remediación prohibida:** Nunca corregir problemas descubiertos durante review sin confirmación explícita del usuario. Reportar → esperar → actuar.
+---
 
-### Señales de Alerta (DETENER y comunicar al usuario)
+## Bloque `contract:` (opcional)
 
-- Petición que cubre 2+ funcionalidades independientes → proponer desglose en tareas separadas
-- Prerequisitos bloqueantes que son tareas en sí mismos → proponer crearlos primero
-- Existe solución más simple (hook nativo, plugin existente) → proponerla
-- Radio de impacto sugiere complejidad diferente a la intuida → advertir y re-clasificar
-- Se pide crear complejidad innecesaria → proponer simplificación (KISS)
-
-### Flujo de Trabajo
-
-1. **Triaje** — Analizar impacto, prerequisitos, alcance (Paso 0.0.6 — T1/T2/T3)
-2. **Alinear** — Presentar alcance al usuario, esperar confirmación (ESTÁNDAR+)
-3. **Pre-flight** — Verificar entorno WordPress (versión, theme, plugins)
-4. **Documentar** — Crear documento de tarea con alcance validado
-5. **Presentar** — Opciones A/B/C
-6. **Implementar** — Solo tras aprobación explícita (opción B)
-
-### Opciones de Implementación (presentar siempre)
-
-**A)** Vista Previa de Cambios de Código — fragmentos antes/después
-**B)** Proceder con Implementación — fase por fase
-**C)** Modificar o Iterar sobre el Plan — ajustar antes de comprometerse
-
-Esperar elección explícita. NUNCA asumir aprobación.
-
-### Durante Implementación
-
-Por cada fase completada:
-- Actualizar checkbox: `[x]` + timestamp + archivos modificados + resultado de verificación
-- Si se descubre que el alcance era incorrecto → DETENER, comunicar, re-planificar
-- Esperar "proceder" antes de siguiente fase
-
-Tras todas las fases: cambiar estado a `Pending Review` → ejecutar checklist de revisión → si APROBADO cambiar a `Completado`.
-
-### Aprobación Explícita
-
-**APROBADO**: "ejecuta", "adelante", "aprobado", "proceder", "se ve bien"
-**NO APROBADO**: "interesante", "ya veo", preguntas sobre el plan, silencio
-**AMBIGUO**: "ok", "vale", "claro" → confirmar antes de proceder
-<!-- /SHARED-BLOCK -->
 
 ---
 

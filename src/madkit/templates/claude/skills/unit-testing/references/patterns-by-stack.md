@@ -2,7 +2,7 @@
 
 > Referencia L2 de la skill `unit-testing`. Cargar solo si el stack del proyecto coincide.
 
-**Sin framework de testing detectado →** indicar al usuario que ejecute `/testing_setup`.
+**Sin framework de testing detectado →** indicar al usuario que active la skill `testing-setup`.
 
 ---
 

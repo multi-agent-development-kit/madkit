@@ -1,6 +1,6 @@
 ---
 name: task-implementation-review
-description: "Verificación de requisitos contra tarea. Activar después de reviewer o antes de marcar tarea como COMPLETADA — valida implementación contra ai_docs/tasks/ punto por punto. NO es revisión de código (→ reviewer)."
+description: "Verificación post-implementación: 1:1 verdict de criterios + testing AAA/Given-When-Then + §10 Engineering Hygiene. Auto-invoca post-reviewer; NO como skill independiente."
 context: fork
 agent: reviewer
 effort: high
@@ -24,143 +24,124 @@ effort: high
 | 6 | Server/Client | Existe limite server/client |
 | 7 | Seguridad | Siempre |
 | 8 | Server Actions | Proyecto usa Server Actions |
+| 9 | Testing del cambio | Siempre que la task tenga código de runtime |
+| 10 | Engineering Hygiene | Siempre que la task toque código ejecutable |
+
+---
+
+## Modos de ejecución
+
+| Modo | Quién ejecuta | Cuándo |
+|---|---|---|
+| **Inline** (modo normal) | `reviewer` subagent | `reviewer-agent.md` pre-carga este knowledge vía `skills:` y ejecuta §7-§10 directamente. **No invocar como Skill tool desde el reviewer** — issue [#38719](https://github.com/anthropics/claude-code/issues/38719) impide que subagents invoquen skills. |
+| **Fork independiente** | Main session vía Skill tool | Solo cuando el usuario invoca explícitamente desde la sesión principal, o necesita validación adicional sin re-ejecutar el reviewer completo. |
+
+**En el encadenamiento normal** (`implementer → reviewer`): el reviewer ejecuta §7-§10 inline usando el knowledge inyectado. El orquestador (main session) puede invocar esta skill como fork adicional post-reviewer si lo necesita.
 
 ---
 
 ## 1. Type Safety (TypeScript)
 
-```typescript
-// Mal: tipo implicito, assertion sin validacion
-async function getUser(id: string) { ... }
-const user = data as User;
-
-// Bien: tipo explicito, type guard
-async function getUser(id: string): Promise<User | undefined> { ... }
-if (isUser(data)) { const user = data; }
-```
-
-- Sin `any` explicitos o implicitos
-- Todas las funciones con tipos de retorno explicitos
-- Sin assertions injustificadas — validar con type guards
+| Patrón | Regla |
+|---|---|
+| Tipo implícito / `any` explícito | Usar tipo concreto o genérico `<T>` |
+| `as User` sin validación | Type guard con `isUser(data)` antes de asumir tipo |
+| Función sin tipo de retorno | `: Promise<User \| undefined>` siempre explícito |
 
 ## 2. Type Safety (Python)
 
-```python
-# Mal
-from typing import Any, Dict, Optional
-def process(data: Any) -> Optional[Dict[str, str]]: ...
-
-# Bien (Python 3.10+)
-def process(data: dict[str, str]) -> dict[str, str] | None: ...
-```
-
-- Sin `Any`, todas las funciones con anotacion de retorno (incluyendo `-> None`)
-- Sintaxis moderna: `dict` no `Dict`, `str | None` no `Optional[str]`
+| Patrón | Regla |
+|---|---|
+| `Any`, `Dict`, `Optional` de `typing` | Sintaxis moderna: `dict`, `str \| None` (Python 3.10+) |
+| Función sin anotación de retorno | `-> Type` obligatorio, incluyendo `-> None` |
 
 ## 3. ADK
 
-```python
-# Mal
-agent = Agent(name="my-agent")
-api_key = os.getenv("GOOGLE_API_KEY")
-
-# Bien
-from config import settings
-root_agent = Agent(name="my-agent", model="gemini-2.0-flash", output_key="result")
-```
-
-- Exportar como `root_agent` con `output_key`
-- Config centralizada sobre `os.getenv()` directo
+| Patrón | Regla |
+|---|---|
+| `os.getenv()` directo | Config centralizada (`from config import settings`) |
+| Agent sin `output_key` | Exportar como `root_agent` con `output_key="result"` |
 
 ## 4. Drizzle ORM
 
-```typescript
-// Mal
-where: sql`user_id = ${userId}`;
-const rows = await db.select().from(usersTable);
-
-// Bien
-import { eq } from 'drizzle-orm';
-where: eq(users.id, userId);
-const rows = await db.select({ id: usersTable.id, email: usersTable.email }).from(usersTable);
-```
-
-- Operadores type-safe sobre SQL raw
-- Transacciones para operaciones atomicas multi-paso
-- Seleccionar solo columnas necesarias
+| Patrón | Regla |
+|---|---|
+| `sql\`user_id = ${id}\`` raw | Usar operadores type-safe: `eq`, `inArray`, etc. |
+| `db.select().from(tabla)` sin columnas | Seleccionar solo columnas necesarias |
+| Operaciones multi-paso no atómicas | Envolver en transacción |
 
 ## 5. Next.js
 
-### Async Params (Next.js 15+)
-```typescript
-// Server Component
-export default async function Page({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-}
-// Client Component
-'use client';
-import { use } from 'react';
-export default function Page({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
-}
-```
-
-### revalidatePath — GOTCHA
-```typescript
-revalidatePath('/dashboard');              // Estatica — tipo opcional
-revalidatePath('/items/[id]', 'page');     // Dinamica — DEBE incluir tipo
-```
-
-- Sin client components async — usar `useEffect` + `useState`
+| Patrón | Regla |
+|---|---|
+| `params` como objeto síncrono (Next 15+) | `params: Promise<{id:string}>` → `await params` (server) / `use(params)` (client) |
+| `revalidatePath('/items/[id]')` sin tipo | `revalidatePath('/items/[id]', 'page')` — dinámicas requieren tipo |
+| Client component `async` | Usar `useEffect` + `useState` |
 
 ## 6. Separacion Server/Client
 
-```
-lib/
-  storage-client.ts    # Client-safe (constantes, tipos, funciones puras)
-  storage.ts           # Server-only (puede re-exportar de -client)
-```
+Estructura canónica: `lib/storage-client.ts` (constantes, tipos, funciones puras) + `lib/storage.ts` (server-only, puede re-exportar de `-client`).
 
-Imports server-only (nunca en cliente): `@/lib/supabase/server`, `@/lib/drizzle`, `next/headers`.
+Imports server-only nunca en cliente: `@/lib/supabase/server`, `@/lib/drizzle`, `next/headers`.
 
 ## 7. Seguridad
 
-```typescript
-// Auth
-const { user, error } = await authenticateRequest();
-if (error || !user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
-
-// Validacion
-const result = InputSchema.safeParse(body);
-if (!result.success) return Response.json({ error: result.error.issues }, { status: 400 });
-
-// Errores de DB
-try {
-  await db.insert(records).values(data);
-} catch (error) {
-  if (error.code === '23505') return Response.json({ error: 'Already exists' }, { status: 409 });
-  console.error('Database error:', error);
-  return Response.json({ error: 'Database error' }, { status: 500 });
-}
-```
-
-- Sin secrets en codigo cliente (solo `NEXT_PUBLIC_*`)
-- Toda entrada de usuario validada (Zod)
+| Patrón | Regla |
+|---|---|
+| Endpoint sin auth | `authenticateRequest()` primero → 401 si falla |
+| Input sin validar | `Schema.safeParse(body)` → 400 con issues si falla |
+| Error de DB no tipado | Capturar código (`'23505'` → 409); log + 500 para el resto |
+| Secret en código cliente | Solo `NEXT_PUBLIC_*` en cliente; resto en server |
 
 ## 8. Server Actions
 
-```typescript
-'use server';
-type ActionResult<T = void> = { success: true; data: T } | { success: false; error: string };
+Shape: `'use server'` + resultado tipado `{ success: true; data: T } | { success: false; error: string }`. Flujo: auth check → validación → operación → `revalidatePath('/ruta', 'page')` → return tipado.
 
-export async function createRecord(data: Input): Promise<ActionResult<{ id: string }>> {
-  const { user, error } = await authenticateRequest();
-  if (error || !user) return { success: false, error: 'Unauthorized' };
-  // ... accion
-  revalidatePath('/items', 'page');
-  return { success: true, data: { id: record.id } };
-}
-```
+---
+
+## 9. Testing del cambio — BLOCKING
+
+> Sustituye al hueco de testing en esta skill. Complementa a la sección §7 de `reviewer-agent.md` (que cubre code review más amplio); aquí se valida el TASK ESPECÍFICO.
+
+| Check | BLOCKING? | Qué buscar |
+|---|---|---|
+| Test de regresión presente para cada bugfix tocado por la task | SÍ | Si el task doc lista bugfix(es) y NO hay test correspondiente con comentario grep-able `// Regresión: task NNN` (o equivalente por lenguaje) → BLOCK |
+| Asserts específicos, no genéricos | SÍ | Tests con `expect(true).toBe(true)`, `toBeTruthy()` solo, `assert.ok()` solo, `assertTrue()` solo → BLOCK. Aceptado: assertion sobre un valor concreto, error tipado o estado verificable |
+| Kill-the-mutant pasó | SÍ | Comentar/invertir línea clave del cambio y re-ejecutar tests del task. Si todos pasan tras la mutación → tests son vanity, no protegen regresión. Excepción: cambio puramente declarativo (rename, formato) sin lógica de runtime |
+
+**Patrón de estructuración de tests:** preferir AAA (Arrange-Act-Assert) para tests unitarios. En contexto BDD, preferir Given-When-Then como especificación de comportamiento: Given=precondición del sistema, When=acción del usuario/sistema, Then=expectativa observable y verificable.
+
+**Cuándo NO aplica esta sección 9:**
+- Task cuyo alcance es cambio puramente documental o de configuración (sin código de runtime).
+- Task que declara explícitamente "sin tests" en "Decisiones aceptadas" del task doc, con justificación.
+
+---
+
+## 10. Engineering Hygiene Criteria — BLOCKING
+
+> Cruza los 4 criterios canónicos del task doc contra el diff final. Complementa §9 del `reviewer-agent` (que verifica contra archivos del diff con verdict 1:1); aquí se valida el TASK ESPECÍFICO post-impl.
+
+| Check | BLOCKING? | Cómo |
+|---|---|---|
+| Los 4 criterios canónicos del task doc están checkeados [x] tras la implementación | SÍ | Si alguno sigue [ ] tras impl → BLOCK con razón explícita |
+| Para cada criterio [x], evidencia citable existe en el diff | SÍ | Citar archivo:línea o comando ejecutado (ej: `npm run lint`, `grep -nE "TODO" src/` con output limpio) |
+| Excepción declarada coincide con la realidad del diff | SÍ | Si "Excepción a Criterios de Calidad de Ingeniería" declarada pero el diff incluye código ejecutable → BLOCK por inconsistencia |
+| TDD: cada archivo de runtime nuevo tiene archivo de test correspondiente | SÍ | `src/foo.ts` nuevo sin `src/foo.test.ts` o equivalente → BLOCK; declarar excepción en task doc si justificable |
+
+**Cuándo NO aplica esta sección 10:**
+
+- Task doc declara excepción literal `Excepción a Criterios de Calidad de Ingeniería: task no toca código ejecutable (solo <docs/config>).` Y el diff lo confirma (cero archivos ejecutables modificados).
+- Task de cambio puramente declarativo (rename de variable, formato) sin lógica de runtime alterada.
+
+---
+
+## Paralelización
+
+Esta skill es **paralelizable post-impl × N por task de la misma wave del DAG**: cuando N tasks completadas con éxito (`reviewer` correlacionado OK), el orquestador DEBE lanzar N `task-implementation-review` (`context: fork` → reviewer) en paralelo en una sola respuesta. Cada instancia valida criterios contra su task doc específico — sin overlap semántico entre tasks de la misma wave.
+
+Skip silente si el task doc no declara criterios verificables (caso raro tras `plan-checker` D1).
+
+Regla canónica: `CLAUDE.md §"Paralelización" / "Paralelización de auditoría/revisión"`.
 
 ---
 

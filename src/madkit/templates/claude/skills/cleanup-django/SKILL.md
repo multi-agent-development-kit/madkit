@@ -4,7 +4,7 @@ description: "Guía Django/DRF. Activar proactivamente EN LUGAR DE cleanup-pytho
 context: fork
 agent: implementer
 effort: high
-paths: ["**/*.py", "**/manage.py", "**/settings.py", "**/urls.py", "**/admin.py", "**/apps.py", "**/tasks.py"]
+paths: ["**/manage.py", "**/settings.py", "**/urls.py", "**/admin.py", "**/apps.py", "**/tasks.py", "**/serializers.py", "**/views.py", "**/models.py"]
 ---
 
 # Limpieza y Codificación Django
@@ -31,20 +31,14 @@ Confirmar: `manage.py` + settings con `INSTALLED_APPS` + apps Django. Detectar: 
 
 Nunca uses `pip install`. Este proyecto usa `uv`.
 
-**Grupos de dependencias:**
-- `[project.dependencies]` → Django, DRF, drivers de BD
-- `[dependency-groups.dev]` → django-extensions, debug-toolbar
-- `[dependency-groups.test]` → pytest-django, factory-boy
-- `[dependency-groups.lint]` → ruff, mypy, django-stubs
+| Grupo | Paquetes típicos |
+|---|---|
+| `[project.dependencies]` | Django, DRF, drivers de BD |
+| `[dependency-groups.dev]` | django-extensions, debug-toolbar |
+| `[dependency-groups.test]` | pytest-django, factory-boy |
+| `[dependency-groups.lint]` | ruff, mypy, django-stubs |
 
-```bash
-uv add "django>=4.2"
-uv add --group dev "django-extensions"
-uv add --group test "pytest-django" "factory-boy"
-uv sync --group dev --group test
-```
-
-**Tras editar pyproject.toml manualmente**, siempre ejecuta `uv sync`.
+Comandos: `uv add <pkg>`, `uv add --group <grupo> <pkg>`, `uv sync --group <grupo>`. Tras editar `pyproject.toml` manualmente → siempre `uv sync`.
 
 ---
 
@@ -101,82 +95,36 @@ posts = Post.objects.prefetch_related('tags', 'comments__author').all()
 
 ## Custom Model Managers
 
-```python
-class PublishedManager(models.Manager):
-    def get_queryset(self):
-        return super().get_queryset().filter(
-            published_at__isnull=False,
-            published_at__lte=timezone.now()
-        )
-
-class Article(models.Model):
-    objects = models.Manager()
-    published = PublishedManager()
-```
+Encapsular querysets repetidos en un `Manager` con `get_queryset()` override. Patrón: `Model.objects` = Manager por defecto + Manager named (ej: `published`) con filtros de negocio. Siempre preservar `objects = models.Manager()` explícito cuando se añaden managers adicionales.
 
 ---
 
-## Scope de Limpieza
+## Scope y Orden de Limpieza
 
-- **Solo archivos de la tarea actual.** No expandir limpieza a módulos adyacentes. Issues fuera del scope → documentar como nota, no actuar.
-- **Antes de eliminar código "muerto":** Verificar que no se use vía signals, admin, template tags, URLs, management commands, middleware o fixtures. En caso de duda → NO eliminar, preguntar al usuario.
-- **`# type: ignore` / `Any` en código no modificado por la tarea** → reportar, no eliminar automáticamente.
+> Reglas de scope universales: ver `cleanup/SKILL.md` §Scope de Limpieza.
 
-## Reglas Críticas
+**Django específico:** antes de eliminar código "muerto", verificar que no se use vía signals, admin, template tags, URLs, middleware, management commands o fixtures. En duda → NO eliminar, preguntar. **NUNCA auto-aplicar migraciones** — solo analizar.
 
-- **NUNCA auto-aplicar migraciones** — solo analizar, nunca modificar estado de BD
-- **SIEMPRE verificar dependencias antes de sugerir eliminación** — código "sin uso" podría estar utilizado via señales, admin, template tags o URLs
+**Prioridad:**
 
-## Orden de Prioridad de Limpieza
+1. Errores críticos — `manage.py check`, migraciones inconsistentes, imports rotos
+2. Código muerto confirmado — apps sin uso en INSTALLED_APPS, serializers/views sin referencia
+3. Type safety — `Any`, `# type: ignore`, anotaciones faltantes
+4. Rendimiento — N+1 queries, índices faltantes, querysets sin optimizar
+5. Seguridad — `|safe` sin justificar, `@csrf_exempt`, `.raw()` sin parametrizar
+6. Deuda de migraciones — candidatas a squash (>15/app), RunPython sin reversa
+7. Dependencias — apps/paquetes no utilizados, versiones con vulnerabilidades
 
-1. **Errores críticos** — `manage.py check` errores, migraciones inconsistentes, imports rotos
-2. **Código muerto confirmado** — apps sin uso en INSTALLED_APPS, serializers/views sin referencia
-3. **Type safety** — usos de `Any`, `# type: ignore`, anotaciones faltantes (si usa django-stubs)
-4. **Rendimiento** — N+1 queries, índices faltantes, querysets sin optimizar
-5. **Seguridad** — `|safe` sin justificar, `@csrf_exempt`, `.raw()` sin parametrizar, secretos expuestos
-6. **Deuda de migraciones** — candidatas a squash (>15 por app), RunPython sin reversa
-7. **Dependencias** — apps/paquetes no utilizados, versiones con vulnerabilidades
-
-## Detección de Código Muerto Django
-
-### INSTALLED_APPS
-Verificar cada app: ¿se importa? ¿tiene middleware activo? ¿tiene URLs incluidas? ¿tiene template tags usados?
-
-### DRF (si instalado)
-
-Para serializers/viewsets en archivos modificados por la tarea actual, verificar que tienen referencia en urls.py o router:
-
-```bash
-# Verificar serializers en archivos modificados (no auditoría global)
-grep -rn "NombreSerializer" --include="*.py" --exclude-dir=migrations  # ¿tiene referencias?
-
-# Verificar viewsets en archivos modificados
-grep -rn "NombreViewSet" --include="urls.py"  # ¿está mapeado?
-```
-
-> Para auditoría global de código muerto DRF → crear tarea dedicada de cleanup.
+**Código muerto DRF:** para serializers/viewsets en archivos modificados, verificar referencia en `urls.py` o router con `grep -rn "NombreSerializer" --include="*.py"`. Para auditoría global → crear tarea dedicada.
 
 ---
 
-## Migraciones: Seguridad
+## Migraciones
 
-- **Siempre reversibles:** `RunPython(forward, reverse)` — nunca sin operación reversa
-- **Backward-compatible:** Agregar columnas como nullable o con defaults
-- **Multi-fase para breaking changes:**
-  1. Agregar nueva columna (nullable)
-  2. Poblar datos + actualizar código
-  3. Hacer NOT NULL + eliminar columna vieja
-
-## Salud de Migraciones
-
-```bash
-python manage.py showmigrations --plan | grep "\[ \]" | wc -l   # pendientes
-grep -rn "RunPython" */migrations/*.py 2>/dev/null | head -10    # sin reversa
-```
-
-## Índices Faltantes
-
-Campos usados en `filter()`, `order_by()`, `exclude()`, `list_filter`, `search_fields` que no tienen `db_index=True` ni están en `Meta.indexes`.
+- **Siempre reversibles:** `RunPython(forward, reverse)` — nunca sin operación reversa.
+- **Backward-compatible:** columnas nuevas como nullable o con defaults. Breaking changes en 3 fases: añadir nullable → poblar + actualizar código → NOT NULL + eliminar vieja.
+- **Índices:** campos usados en `filter()`, `order_by()`, `exclude()`, `list_filter`, `search_fields` sin `db_index=True` ni `Meta.indexes` → flag.
+- **Salud:** `python manage.py showmigrations --plan | grep "\[ \]" | wc -l` (pendientes); `grep -rn "RunPython" */migrations/*.py` (sin reversa).
 
 ---
 

@@ -1,6 +1,10 @@
 # Plantilla de Diseño de Orquestación de Agentes ADK
 
-> **Instrucciones:** Guía al usuario a través de un proceso de dos fases para diseñar arquitecturas de agentes ADK válidas y producir un documento de diseño completo. NO implementar código — este command genera un DOCUMENTO DE DISEÑO únicamente.
+> **Instrucciones:** Slash command de invocación explícita. Guía al usuario a través de un proceso de tres fases (auditoría exhaustiva → input + clarificación → diseño) para diseñar arquitecturas de agentes ADK válidas y producir un documento de diseño completo. NO implementar código — este command genera un DOCUMENTO DE DISEÑO únicamente.
+>
+> **Por qué command y no skill:** el flujo es multi-turno interactivo (usuario↔asistente alternan preguntas y respuestas entre fases). `context: fork` aislaría la sesión y rompería el diálogo. Invocación explícita por el usuario garantiza control consciente sobre la generación del documento `DESIGN_*.md`.
+>
+> **Cuándo usar:** usuario tipea `/adk_orchestrator_template` para iniciar el diseño de un orquestador ADK. NO usar para implementación (eso es flujo de task-planner cargando `references/task_template_adk.md`) ni para diagnóstico (eso es skill `adk-bottleneck-analysis`).
 
 ---
 
@@ -8,7 +12,7 @@
 
 ### COMPORTAMIENTO OBLIGATORIO
 
-**Esta plantilla crea un DOCUMENTO DE DISEÑO DE ARQUITECTURA únicamente. NO implementar directamente.**
+**Esta skill crea un DOCUMENTO DE DISEÑO DE ARQUITECTURA únicamente. NO implementar directamente.**
 
 El documento se guarda en: `ai_docs/tasks/XXX_DESIGN_WORKFLOW_NAME.md`
 
@@ -18,7 +22,65 @@ El documento se guarda en: `ai_docs/tasks/XXX_DESIGN_WORKFLOW_NAME.md`
 
 ## VIOLACIÓN DE FASES
 
-**NUNCA hacer preguntas de Fase 1 y Fase 2 juntas.** Esto es un error crítico que rompe el proceso.
+**NUNCA hacer preguntas de Fase 1 y Fase 2 juntas.** Esto es un error crítico que rompe el proceso. La Pre-Fase 0 (auditoría) DEBE completarse antes de iniciar Fase 1.
+
+---
+
+## Pre-Fase 0: Auditoría Exhaustiva del Contexto (OBLIGATORIA antes de Fase 1)
+
+> Esta fase previene **falsos positivos** (diseñar sobre asunciones erróneas) y **rebota contradicciones tempranas** entre lo que el usuario pide y lo que ADK soporta. Sin Pre-Fase 0 completa, NO proceder a Fase 1 — un diseño construido sobre asunciones no verificadas se convierte en deuda técnica desde el día 1.
+
+### 0.1 Verificación del proyecto (objetivo, leer artefactos)
+
+Comprobar mecánicamente. Cada item debe tener evidencia concreta — no asumir, leer.
+
+- [ ] `pyproject.toml` o `requirements.txt` declara `google-adk` (cualquier versión). Si no existe → DETENER y consultar (¿es proyecto nuevo? ¿error de detección de stack?).
+- [ ] Versión SDK detectada y registrada (formato: `google-adk==X.Y.Z`). Recordar para Fase 1 al sugerir features que dependen de versión.
+- [ ] Existe al menos un `agent.py` en el proyecto, o el usuario explícitamente está creando un proyecto ADK desde cero.
+- [ ] Documentación de referencia disponible: si `ai_docs/refs/adk-python/` existe → leer `CHANGELOG.md` para conocer features del SDK actual. Si no existe → fallback a `pip show google-adk` y nota oficial.
+
+**Si CUALQUIER item falla:** parar, reportar al usuario, consultar antes de continuar. NO inventar contexto.
+
+### 0.2 Asunciones implícitas → explícitas
+
+El usuario suele tener asunciones implícitas que afectan el diseño. Hacerlas explícitas y documentar las respuestas. Si el usuario no sabe, marcar como "decisión pendiente" + default razonable + anotación.
+
+| Asunción | Pregunta al usuario | Default si no sabe |
+|---|---|---|
+| Plataforma | ¿Vertex AI o Gemini API directo? | Vertex AI (más completo en producción) |
+| Topología | ¿Single-agent o multi-agent? | Inferir del scope: ≥2 dominios = multi-agent |
+| Estado | ¿Sessions persistentes (DB) o ephemeral (memoria)? | Ephemeral en dev, persistente en prod |
+| Auth | ¿OAuth, API key, service account? | API key (simplest) |
+| Despliegue | ¿Cloud Run, GKE, local? | Cloud Run (default ADK) |
+| Modelo | ¿gemini-2.5-flash, gemini-2.5-pro, otro? | Flash para latencia, Pro para razonamiento |
+
+Documentar cada respuesta en el documento `DESIGN_*.md` final, sección "Asunciones declaradas".
+
+### 0.3 Detección de falsos positivos
+
+Términos ambiguos que comúnmente generan diseños incorrectos. Si el usuario los usa, **CLARIFICAR explícitamente** antes de Fase 1:
+
+| Término del usuario | Riesgo de falso positivo | Aclaración requerida |
+|---|---|---|
+| "autonomous", "autónomo" | ADK NO ejecuta autónomamente — agentes responden a input | Confirmar: el agente responde a llamada del usuario, no actúa solo |
+| "trigger automático", "scheduled" | ADK no tiene scheduler nativo | Si necesita scheduling: requiere Cloud Scheduler externo invocando al agente |
+| "siempre activo", "background" | Sesiones ADK son por-request | Aclarar si requiere worker background separado |
+| "agent" sin contexto | Puede ser LangChain/AutoGen/CrewAI, no ADK | Verificar que el usuario se refiere a Google ADK específicamente |
+| "workflow", "pipeline" | Ambiguo (ADK SequentialAgent vs flujo manual) | Confirmar: ¿agente ADK orquesta sub-agentes, o código orquesta agentes? |
+
+**Si detectas un falso positivo no aclarado:** parar, citar el término, preguntar al usuario. NO seguir diseñando con asunción.
+
+### 0.4 Validation Gates antes de Fase 1
+
+Antes de pasar a Fase 1, validar todas estas condiciones (lista verificable, cada una explícita):
+
+1. ✅ `0.1` completa — todas las verificaciones objetivas tienen evidencia documentada.
+2. ✅ `0.2` completa — cada asunción tiene respuesta del usuario o default declarado.
+3. ✅ `0.3` completa — cero términos ambiguos sin aclarar.
+4. ✅ Sin contradicciones entre lo que el usuario pide y lo que ADK soporta (ej. "agente que se ejecute cada 10 min" requiere scheduler externo, NO es flujo ADK puro).
+5. ✅ El usuario tiene claro qué va a producir este command: un documento `XXX_DESIGN_*.md`, NO código ejecutable.
+
+**Si CUALQUIER gate falla:** DETENER, reportar al usuario el gate específico que bloquea, NO proceder a Fase 1. Opciones de resolución: (a) responder a las preguntas pendientes, (b) abortar el comando si el usuario decide otro approach, (c) cambiar de stack si ADK no encaja.
 
 ---
 
@@ -525,7 +587,7 @@ Observaciones del Asistente:
 > Optimización | Alternativa de arquitectura | Ajuste de granularidad
 
 Opciones:
-A) Aprobar diseño y crear tarea de implementación con /task_template_adk
+A) Aprobar diseño y crear tarea de implementación (task-planner cargará automáticamente `references/task_template_adk.md`)
 B) Modificar arquitectura o refinar diseño
 C) Explorar arquitectura alternativa
 ```
