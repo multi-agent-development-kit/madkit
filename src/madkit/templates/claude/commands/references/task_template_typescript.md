@@ -1,8 +1,8 @@
 # Plantilla de Tarea de IA para TypeScript/Next.js
 
-> Esta plantilla crea documentos de tareas para desarrollo TypeScript/Next.js con IA. Referencia el protocolo genérico de `task_template.md` y agrega análisis, patrones y validación específicos de TypeScript.
+> Esta plantilla crea documentos de tareas para desarrollo TypeScript/Next.js con IA. Complementa la plantilla base (`task_template.md`) y agrega análisis, patrones y validación específicos de TypeScript.
 >
-> **Cabecera de Metadatos opcional (T079):** los task docs pueden incluir cabecera blockquote con `> **Depende de:**`, `> **Asunciones:**` y sub-sección "Wiring esperado" para el flujo `task-planner` Paso 0.6 (waves). Ver documentación completa en [`task_template.md`](task_template.md) §"Cabecera de Metadatos del Task Doc (opcional)" — esta plantilla hereda esa especificación.
+> **Cabecera de Metadatos opcional:** los task docs pueden incluir cabecera blockquote con `> **Depende de:**`, `> **Asunciones:**` y sub-sección "Wiring esperado" para el flujo `task-planner` Paso 0.6 (waves).
 
 ---
 
@@ -75,139 +75,6 @@
 
 ---
 
-<!-- SHARED-BLOCK: protocolo-creacion-v1 -->
-### Paso 0.1: Verificar Estructura del Proyecto
-
-Confirmar que la estructura de documentación requerida existe.
-
-- Verificar que el directorio `ai_docs/` existe
-- Verificar que el subdirectorio `ai_docs/tasks/` existe
-
-**Si no se encuentra:** DETENER y preguntar al usuario: "No veo un directorio `ai_docs/`. ¿Debería crearlo?"
-
----
-
-### Paso 0.2: Verificar Documento de Tarea Activa
-
-**Antes de crear una nueva tarea, verificar si ya existe una para este trabajo:**
-
-1. Listar archivos en `ai_docs/tasks/` y buscar un documento relacionado con la solicitud actual
-2. Si el usuario pide correcciones/revisiones de trabajo anterior → encontrar y ACTUALIZAR ese documento
-3. Si el usuario pide continuar implementación → encontrar y ACTUALIZAR ese documento
-4. **Solo crear un nuevo número de tarea si es trabajo genuinamente NUEVO sin documento existente**
-
-**Si se encuentra tarea activa:** Saltar al Paso 0.5 y trabajar sobre el documento existente.
-
----
-
-### Paso 0.3: Detectar Siguiente Número de Tarea
-
-**Solo si el Paso 0.2 confirmó que no aplica ninguna tarea existente:**
-
-1. Listar archivos en `ai_docs/tasks/`
-2. Extraer el prefijo de 3 dígitos de CADA nombre de archivo
-3. Encontrar el número mas alto entre TODOS los archivos
-4. Sumar 1 y formatear con 3 dígitos
-5. Si no existen archivos: usar 001
-
-**Reglas:** Secuencia global compartida, siempre 3 dígitos, cada número se usa EXACTAMENTE UNA VEZ.
-- ❌ El número `000` está RESERVADO para calibración del proyecto — nunca usar para tareas normales
-
----
-
-### Paso 0.4: Crear Documento de Tarea
-
-**CRÍTICO: UNA tarea = UN archivo. UN número = UN archivo. Sin excepciones.**
-
-**Convención de Nombres para TypeScript/Next.js:**
-- **Formato:** `XXX_camelCaseName.md`
-- **Convención:** camelCase (JavaScript/TypeScript)
-- **Ubicación:** `ai_docs/tasks/XXX_camelCaseName.md`
-- **Verificar:** NO exista un archivo con ese prefijo de número
-
----
-
-### Paso 0.5: Presentar Documento de Tarea al Usuario
-
-**NOTA:** El análisis crítico de impacto, prerequisitos y alcance ya se realizó en el Triaje de Ingeniería (Paso 0.0.6). Aquí se presenta el documento ya validado.
-
-**Verificación rápida antes de presentar:**
-- ¿El documento refleja el alcance validado en T3? Si no → actualizar.
-- ¿Se descubrió algo nuevo durante el análisis de Context Providers? Si sí → comunicar como observación.
-
-Presentar al usuario:
-
-```
-Documento de Tarea Creado: `ai_docs/tasks/XXX_camelCaseName.md`
-
-Resumen del Enfoque Planificado:
-[Resumen breve de 2-3 oraciones]
-
-[Solo si se descubrió algo nuevo:]
-Observaciones Adicionales:
-- **[Categoría]:** [Observación concreta]
-
-¿Cómo deseas proceder?
-
-A) Vista Previa de Cambios de Código Detallados
-B) Aprobar e Iniciar Implementación
-C) Modificar o Iterar sobre el Plan
-```
-
-PUNTO DE ESPERA OBLIGATORIO: DETENERSE y esperar elección explícita del usuario.
-
-**NOTA SOBRE ITERACIÓN:** La iteración es el proceso normal. Si el usuario elige C, actualizar el documento existente, incorporar el feedback, y re-presentar.
-
----
-
-### Paso 0.6: Manejar Retroalimentación del Usuario
-
-**Si el usuario elige Opción C (Modificar) o solicita cambios:**
-- Actualizar el documento de tarea EXISTENTE — NO crear nuevos archivos
-- NO crear nuevas versiones (`_v2`, `_updated`, etc.)
-
----
-
-### Paso 0.7: Actualizaciones de Fase de Implementación
-
-**Cuando el usuario aprueba (Opción B) y la implementación comienza:**
-- Documentar progreso en el documento de tarea EXISTENTE agregando/actualizando una sección `## Progreso`
-- NO modificar plantillas en `.claude/commands/`
-
-#### Regla de Alcance Estricto (ACTIVA durante toda la implementación)
-
-> OBLIGATORIO: Solo modificar código directamente relacionado con la sección "Incluye".
-
-- Si se descubre un problema FUERA del alcance:
-  1. **NO arreglarlo** — documentarlo como nota en "Descubrimientos fuera de alcance" del task document
-  2. Si es BLOQUEANTE para la tarea actual: PAUSAR, informar al usuario, esperar decisión
-  3. Si NO es bloqueante: ignorarlo completamente
-- **Test rápido:** ¿Este cambio está en "Incluye"? → SI: proceder. NO: no tocarlo.
-- **Excepción única:** errores de sintaxis/compilación en líneas que YA se están modificando
-- **Prohibido:** arreglar warnings, code smells, o deuda técnica encontrada "de paso"
-
-**Agregar sección de seguimiento:**
-```markdown
-## Seguimiento del Ciclo de Vida de Tarea
-
-### Creación
-- **Creado:** [timestamp]
-- **Creado Por:** task_template_typescript.md
-- **Número de Tarea:** [XXX]
-- **Complejidad Inicial:** [Simple | Estándar | Compleja | Crítica]
-
-### Revisiones
-- [Fecha]: [Que cambio y por que]
-
-### Progreso de Implementación / Estado de Finalización
-- **Estado:** [Planificación | En Progreso | Pending Review | Completado | Bloqueado]
-- **Última Actualización:** [timestamp]
-```
-
-<!-- /SHARED-BLOCK -->
-
----
-
 ## 0. Validación Pre-Vuelo (Específica de TypeScript)
 
 DETENER. NO proceder si CUALQUIER validación falla. Resolver TODOS los fallos antes de continuar.
@@ -243,36 +110,31 @@ DETENER. NO proceder si CUALQUIER validación falla. Resolver TODOS los fallos a
 
 ### 0.0.6 — Triaje de Ingeniería (OBLIGATORIO para ESTÁNDAR+)
 
-<!-- AI Agent: Para tareas SIMPLE (<=2 archivos), el triaje es mental — verificar rápidamente y pasar al Paso 0.1. Para ESTÁNDAR+, es conversación explícita con el usuario. -->
+**Delta TypeScript/Next.js para T1 "Radio de impacto":**
 
-**T1: Analizar** — Examinar el codebase para responder:
+- Unidad de análisis: **componentes, server actions, context providers, páginas, layouts, middleware**.
+- Prerequisitos típicos: Next.js config, rutas, middleware, context providers necesarios.
+- Integración: patrones de Server Actions, Context, data access establecidos.
+- Decisiones stack-specific en T2: Server Action vs API Route · Context vs props · SSR vs CSR · Drizzle vs query directa.
 
-- **Radio de impacto:** ¿Cuántos componentes, server actions, context providers, páginas se ven afectados?
-  - <=2 archivos en 1 módulo → SIMPLE
-  - 3-6 archivos en 1-2 módulos → ESTÁNDAR
-  - 6+ archivos o 3+ módulos → COMPLEJA
-  - Sistemas externos, datos de producción, prerequisitos bloqueantes → CRÍTICA
-- **Prerequisitos:** ¿Qué debe existir? Next.js config, rutas, middleware, context providers necesarios. Trazar dependencias (max 2 niveles). ✅ existe | ❌ falta.
-- **Integración:** ¿Hay patrones de Server Actions, Context, data access establecidos que seguir?
-- **Stack-specific:** ¿Server Action o API Route? ¿Context o props? ¿SSR o CSR? Verificar antes de planificar.
+**Tabla de complejidad (común a todos los stacks):**
 
-**T2: Cuestionar (solo si hay razón):**
+| Radio | Complejidad |
+|---|---|
+| ≤2 archivos en 1 módulo | SIMPLE |
+| 3-6 archivos en 1-2 módulos | ESTÁNDAR |
+| 6+ archivos o 3+ módulos | COMPLEJA |
+| Sistemas externos / datos producción / prerequisitos bloqueantes | CRÍTICA |
 
-- Alcance cubre 2+ funcionalidades independientes → proponer desglose
-- Existe solución más simple (Server Action vs API Route, Context existente vs nuevo) → proponerla
-- Prerequisitos bloqueantes (tablas, context providers, middleware) → proponer tareas separadas
-- Sobre-diseño detectado → proponer simplificación (KISS)
+---
 
-**T3: Alinear** — Para ESTÁNDAR+, presentar al usuario:
+### Pasos 0.1–0.7 — Gestión del documento de tarea
 
-```
-Alcance: [1-2 frases]
-Complejidad: [nivel] — [N archivos, M módulos]
-Prerequisitos: [lista si hay] / Ninguno detectado
-¿Confirmas este alcance para crear el documento de tarea?
-```
+**Delta TypeScript/Next.js:**
 
-**PUNTO DE ESPERA:** Para ESTÁNDAR+, esperar confirmación antes de proceder.
+- **Paso 0.4 — Convención de nombres:** `XXX_camelCaseName.md` (camelCase JS/TS). Ubicación: `ai_docs/tasks/XXX_camelCaseName.md`.
+- **Paso 0.5 — Verificación rápida antes de presentar:** ¿Se descubrió algo nuevo durante el análisis de Context Providers (Sección 1)? Si sí → comunicar como observación.
+- **Paso 0.7 — Cabecera de seguimiento:** `Creado Por: task_template_typescript.md`.
 
 ---
 
@@ -366,7 +228,6 @@ subscription.tier: "free" | "pro" | "enterprise"
 
 ---
 
-<!-- SHARED-BLOCK: alternativas-v1 -->
 ## 1B. Análisis de Alternativas de Implementación
 
 **OBLIGATORIO para tareas ESTÁNDAR o superior. Para SIMPLE, documentar brevemente por que solo hay un enfoque viable.**
@@ -423,14 +284,22 @@ Realizar análisis completo si se cumplen 2+ criterios:
 
 Presentar las alternativas al usuario con la recomendación. **Esperar aprobación antes de proceder con las secciones de implementación.**
 
-<!-- /SHARED-BLOCK -->
-
 ---
 
-<!-- SHARED-BLOCK: edge-cases-v1 -->
-## 1C. Análisis de Modos de Falla y Casos Extremos
+## 1C. Casos límite mínimos y modos de falla (obligatorio)
 
-**OBLIGATORIO para tareas ESTÁNDAR o superior. Para SIMPLE, omitir esta sección.**
+**OBLIGATORIO para todas las complejidades (SIMPLE, ESTÁNDAR, COMPLEJA, CRÍTICA).** La sección debe tener ≥3 entradas concretas con respuesta esperada. plan-checker D8 BLOQUEA si artifact ejecutable nuevo sin la sección o <3 entradas concretas.
+
+### Las 3 preguntas mínimas (responder concretamente)
+
+- **Input vacío / null / no existente:** ¿Qué pasa si formularios vacíos, props undefined, params null, o queries con resultados vacíos?
+  **Respuesta esperada:** _[validación con Zod, error tipado, fallback UI]_
+- **Fallo de dependencia externa:** ¿Qué pasa si fetch falla, server action timeouts, o DB query falla?
+  **Respuesta esperada:** _[error boundary, retry, optimistic UI con rollback]_
+- **Estado tras error parcial:** ¿Qué pasa si una mutation falla a mitad? ¿Hay revalidation / rollback / hidratación inconsistente?
+  **Respuesta esperada:** _[transacción Drizzle, revalidatePath, error recovery]_
+
+Para preguntas adicionales por tipo de artifact, ver **`references/edge-cases-catalog.md`**.
 
 > Antes de disenar la implementación, analizar sistematicamente que puede salir mal. Los edge cases descubiertos aqui deben informar el diseño, no solo validarse en testing.
 
@@ -459,11 +328,8 @@ Presentar las alternativas al usuario con la recomendación. **Esperar aprobaci�
 ### Riesgos Aceptados (Bajo Impacto o Baja Probabilidad)
 - [Listar las que se decide no manejar, con justificación]
 
-<!-- /SHARED-BLOCK -->
-
 ---
 
-<!-- SHARED-BLOCK: rollback-v1 -->
 ## 1D. Estrategia de Rollback (OBLIGATORIO para COMPLEJA/CRÍTICA)
 
 Cada tarea COMPLEJA o CRÍTICA DEBE incluir un plan de rollback:
@@ -488,8 +354,6 @@ Cada tarea COMPLEJA o CRÍTICA DEBE incluir un plan de rollback:
 - **Tiempo estimado de rollback:** [Minutos/horas]
 - **Datos en riesgo:** [Que datos podrían perderse]
 - **Verificación post-rollback:** [Como confirmar éxito]
-
-<!-- /SHARED-BLOCK -->
 
 ---
 
@@ -800,9 +664,7 @@ COMANDOS PERMITIDOS (Solo análisis estático seguro):
 1. **Requisitos** — Mapear cada criterio de éxito a su implementación (archivo:línea). Si alguno NO CUMPLIDO → DETENER.
 2. **Linting y tipos** — `npm run lint` + `npm run type-check`. 0 NUEVOS errores introducidos por los cambios (errores preexistentes fuera de alcance).
 3. **Code smells** — Buscar EN ARCHIVOS MODIFICADOS: TODO/FIXME, console.log, código comentado, imports no usados. Reportar hallazgos; NO eliminar sin confirmación del usuario.
-4. **DRY** — En archivos modificados, verificar que no se duplica lógica ya existente en el codebase. Si se encuentra duplicación → reportar al usuario con propuesta de extracción; NO extraer automáticamente.
-5. **KISS** — ¿Es la implementación más simple posible? No crear abstracciones para un solo uso.
-6. **Separación de responsabilidades** — Server Actions para mutations, lib/ para queries complejas, componentes solo presentación. Sin lógica de negocio en componentes.
+4. **DRY/KISS/SoC: responsabilidad del `reviewer` agent §2/§3/§5 post-impl.** El implementer respeta P2 + P3 sin aplicar refactor proactivo. Server Actions para mutations, lib/ para queries complejas, componentes solo presentación — el reviewer correlacionado verifica adherencia post-impl.
 7. **Seguridad** — Validación de inputs server-side, sin secretos en client, permisos verificados.
 8. **Integración** — Listar importers de módulos modificados (todos los que existan, sin mínimo artificial) → verificar cada uno. Sin dependencias circulares (`npx madge --circular` si disponible).
 9. **Regresión** — Ejecutar `npm test` completo. Si no hay tests → documentar como riesgo.
@@ -833,83 +695,29 @@ SIEMPRE:
 
 ---
 
-<!-- SHARED-BLOCK: puerta-pre-impl-v1 -->
 ## PUERTA PRE-IMPLEMENTACIÓN (OBLIGATORIO)
 
-Antes de iniciar cualquier implementación, TODOS los checkboxes deben estar marcados:
-
-- [ ] Triaje de Ingeniería completado — alcance validado con usuario (ESTÁNDAR+)
-- [ ] Prerequisitos verificados — todos existen o tienen tarea separada
-- [ ] Complejidad clasificada (SIMPLE / ESTÁNDAR / COMPLEJA / CRÍTICA)
-- [ ] Pre-flight completado sin errores
-- [ ] Context providers analizados (Sección 1)
-- [ ] Archivos afectados identificados
-- [ ] Alternativas evaluadas (ESTÁNDAR+)
-- [ ] Casos extremos analizados (ESTÁNDAR+)
-- [ ] Rollback documentado (COMPLEJA/CRÍTICA)
-- [ ] Criterios de éxito medibles definidos
-- [ ] Documento presentado y aprobado por usuario
-
-→ Si CUALQUIER checkbox sin marcar: DETENER. No implementar.
-
-<!-- /SHARED-BLOCK -->
+**Delta TypeScript/Next.js:**
+- Añadir checkbox: `[ ] Context providers analizados (Sección 1)` — específico TS por el protocolo de 5 pasos del análisis de Context.
 
 ---
 
-<!-- SHARED-BLOCK: instrucciones-agente-v3 -->
 ## Instrucciones para el Agente de IA
 
-**Rol: Ingeniero de Software Senior, no documentador.**
+Ver sección canónica en `task_template.md` §"Instrucciones canónicas para el Agente de IA". Deltas específicos de TypeScript/Next.js:
 
-El asistente NO acepta la petición del usuario sin análisis. ANTES de crear cualquier documento de tarea, ejecutar el Triaje de Ingeniería (Paso 0.0.6): analizar impacto, trazar prerequisitos, evaluar alcance.
+- **Triaje App Router:** distinguir Client Component (`"use client"`) vs Server Component antes de planificar; impacto en bundle size y hydration difiere.
+- **Tipos estrictos:** verificar en Checklist que el cambio no introduce `any` implícito; `tsc --noEmit` limpio.
+- **Pre-flight:** verificar Node.js, versión de Next.js, y Context Providers activos en `_app` / `layout.tsx`.
 
-### Disciplina de Alcance (OBLIGATORIO)
+---
 
-> Complementa la "Regla de Alcance Estricto" del Paso 0.6 con principios de decisión.
+## Acciones Prohibidas y Documento Único
 
-- **Decisiones intencionales:** Asumir que código existente fuera del alcance refleja decisiones de negocio válidas. No sugerir cambios a código funcional que no está en el scope.
-- **Auto-remediación prohibida:** Nunca corregir problemas descubiertos durante review sin confirmación explícita del usuario. Reportar → esperar → actuar.
+---
 
-### Señales de Alerta (DETENER y comunicar al usuario)
+## Bloque `contract:` (opcional)
 
-- Petición que cubre 2+ funcionalidades independientes → proponer desglose en tareas separadas
-- Prerequisitos bloqueantes que son tareas en sí mismos → proponer crearlos primero
-- Existe solución más simple en el codebase o framework → proponerla
-- Radio de impacto sugiere complejidad diferente a la intuida → advertir y re-clasificar
-- Se pide crear complejidad innecesaria → proponer simplificación (KISS)
-
-### Flujo de Trabajo
-
-1. **Triaje** — Analizar impacto, prerequisitos, alcance (Paso 0.0.6 — T1/T2/T3)
-2. **Alinear** — Presentar alcance al usuario, esperar confirmación (ESTÁNDAR+)
-3. **Pre-flight** — Verificar entorno TypeScript (Node.js, framework, Context Providers)
-4. **Documentar** — Crear documento de tarea con alcance validado
-5. **Presentar** — Opciones A/B/C
-6. **Implementar** — Solo tras aprobación explícita (opción B)
-
-### Opciones de Implementación (presentar siempre)
-
-**A)** Vista Previa de Cambios de Código — fragmentos antes/después
-**B)** Proceder con Implementación — fase por fase
-**C)** Modificar o Iterar sobre el Plan — ajustar antes de comprometerse
-
-Esperar elección explícita. NUNCA asumir aprobación.
-
-### Durante Implementación
-
-Por cada fase completada:
-- Actualizar checkbox del documento de tarea: `[x]` + timestamp + archivos modificados + resultado de verificación (lint/types)
-- Si se descubre que el alcance era incorrecto → DETENER, comunicar, re-planificar
-- Esperar "proceder" antes de siguiente fase
-
-Tras todas las fases: cambiar estado a `Pending Review` → ejecutar checklist de revisión → si APROBADO cambiar a `Completado`.
-
-### Aprobación Explícita
-
-**APROBADO**: "ejecuta", "adelante", "aprobado", "proceder", "se ve bien"
-**NO APROBADO**: "interesante", "ya veo", preguntas sobre el plan, silencio
-**AMBIGUO**: "ok", "vale", "claro" → confirmar antes de proceder
-<!-- /SHARED-BLOCK -->
 
 ---
 

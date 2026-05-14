@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-// hook-version: 1.0.0
 // Context Monitor — PostToolUse hook
 //
 // Lee métricas de contexto del bridge file que escribe el statusline de Claude Code
@@ -27,77 +26,70 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
+// Resolución robusta de la ruta a ai_docs/ mediante .claude/.ai_docs_path.
+// Fallback garantizado a cwd/ai_docs para cero regresión en proyectos canónicos.
+function resolveAiDocsDir(cwd) {
+  const overridePath = path.join(cwd, '.claude', '.ai_docs_path');
+  try {
+    const raw = fs.readFileSync(overridePath, 'utf8').replace(/^﻿/, '');
+    const resolved = raw.split('\n')
+      .map(l => l.trim())
+      .filter(l => l && !l.startsWith('#'))[0];
+    if (resolved && path.isAbsolute(resolved) && fs.existsSync(resolved)) {
+      return resolved;
+    }
+  } catch (_) { /* archivo no existe o no legible → fallback */ }
+  return path.join(cwd, 'ai_docs');
+}
+
 const WARNING_THRESHOLD = 35;
 const CRITICAL_THRESHOLD = 25;
 const BREADCRUMB_THRESHOLD = 10;
 const STALE_SECONDS = 60;
 const DEBOUNCE_CALLS = 5;
 
-let input = '';
-const stdinTimeout = setTimeout(() => process.exit(0), 10000);
-process.stdin.setEncoding('utf8');
-process.stdin.on('data', chunk => input += chunk);
-process.stdin.on('end', () => {
-  clearTimeout(stdinTimeout);
+async function runHook(input) {
   try {
-    const data = JSON.parse(input);
+    const data = typeof input === 'string' ? JSON.parse(input) : (input || {});
     const sessionId = data.session_id;
 
-    if (!sessionId) {
-      process.exit(0);
-    }
+    if (!sessionId) return { exitCode: 0 };
 
     // Sanitizar session_id: rechazar separadores de path o ".." para evitar traversal
-    if (/[/\\]|\.\./.test(sessionId)) {
-      process.exit(0);
-    }
+    if (/[/\\]|\.\./.test(sessionId)) return { exitCode: 0 };
 
     const cwd = data.cwd || process.cwd();
 
-    // Opt-in: leer .claude/hooks/config.json. Si la flag context_monitor es false
-    // o ausente, exit silencioso. Si el config no existe, hook desactivado.
     const configPath = path.join(cwd, '.claude', 'hooks', 'config.json');
-    if (!fs.existsSync(configPath)) {
-      process.exit(0);
-    }
+    if (!fs.existsSync(configPath)) return { exitCode: 0 };
     let config;
     try {
       config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
     } catch {
-      process.exit(0);
+      return { exitCode: 0 };
     }
-    if (config.context_monitor !== true) {
-      process.exit(0);
-    }
+    if (config.context_monitor !== true) return { exitCode: 0 };
 
-    // Bridge file que escribe el statusline
     const tmpDir = os.tmpdir();
     const metricsPath = path.join(tmpDir, `claude-ctx-${sessionId}.json`);
 
-    if (!fs.existsSync(metricsPath)) {
-      process.exit(0);
-    }
+    if (!fs.existsSync(metricsPath)) return { exitCode: 0 };
 
     let metrics;
     try {
       metrics = JSON.parse(fs.readFileSync(metricsPath, 'utf8'));
     } catch {
-      process.exit(0);
+      return { exitCode: 0 };
     }
 
     const now = Math.floor(Date.now() / 1000);
-    if (metrics.timestamp && (now - metrics.timestamp) > STALE_SECONDS) {
-      process.exit(0);
-    }
+    if (metrics.timestamp && (now - metrics.timestamp) > STALE_SECONDS) return { exitCode: 0 };
 
     const remaining = metrics.remaining_percentage;
     const usedPct = metrics.used_pct;
 
-    if (typeof remaining !== 'number' || remaining > WARNING_THRESHOLD) {
-      process.exit(0);
-    }
+    if (typeof remaining !== 'number' || remaining > WARNING_THRESHOLD) return { exitCode: 0 };
 
-    // Debounce
     const warnPath = path.join(tmpDir, `claude-ctx-${sessionId}-warned.json`);
     let warnData = { callsSinceWarn: 0, lastLevel: null, breadcrumbWritten: false };
     let firstWarn = true;
@@ -120,7 +112,7 @@ process.stdin.on('end', () => {
     const severityEscalated = currentLevel === 'critical' && warnData.lastLevel === 'warning';
     if (!firstWarn && warnData.callsSinceWarn < DEBOUNCE_CALLS && !severityEscalated && !isBreadcrumb) {
       fs.writeFileSync(warnPath, JSON.stringify(warnData));
-      process.exit(0);
+      return { exitCode: 0 };
     }
 
     warnData.callsSinceWarn = 0;
@@ -131,7 +123,7 @@ process.stdin.on('end', () => {
     // para no sobrescribir el "momento de crash" en cada debounce.
     if (isBreadcrumb && !warnData.breadcrumbWritten) {
       try {
-        const stateDir = path.join(cwd, 'ai_docs');
+        const stateDir = resolveAiDocsDir(cwd);
         if (fs.existsSync(stateDir)) {
           const statePath = path.join(stateDir, 'STATE.md');
           const lastTool = data.tool_name || 'unknown';
@@ -148,8 +140,8 @@ process.stdin.on('end', () => {
                 .filter(f => /^\d{3}_.*\.md$/.test(f))
                 .sort();
               if (taskFiles.length > 0) {
-                const lastFile = taskFiles[taskFiles.length - 1];
-                const match = lastFile.match(/^(\d{3})_/);
+                const latestTaskFile = taskFiles[taskFiles.length - 1];
+                const match = latestTaskFile.match(/^(\d{3})_/);
                 if (match) activeTask = match[1];
               }
             } catch { /* ignore */ }
@@ -201,16 +193,33 @@ Contexto agotado al ${usedPct}% (${remaining}% restante). Sesión cerrada en ple
         `Si no estás entre pasos definidos del plan, considera avisar al usuario para preparar pausa.`;
     }
 
-    const output = {
+    const stdoutJson = {
       hookSpecificOutput: {
         hookEventName: 'PostToolUse',
         additionalContext: message
       }
     };
-
-    process.stdout.write(JSON.stringify(output));
+    return { exitCode: 0, stdoutJson };
   } catch {
-    // Silent fail — nunca bloquear ejecución de tools
-    process.exit(0);
+    return { exitCode: 0 };
   }
-});
+}
+
+module.exports = runHook;
+module.exports.runHook = runHook;
+
+if (require.main === module) {
+  let raw = '';
+  const t = setTimeout(() => process.exit(0), 10000);
+  process.stdin.setEncoding('utf8');
+  process.stdin.on('data', c => raw += c);
+  process.stdin.on('end', async () => {
+    clearTimeout(t);
+    let parsed = {};
+    try { parsed = raw.trim() ? JSON.parse(raw) : {}; } catch { process.exit(0); return; }
+    const r = await runHook(parsed);
+    if (r.stderr) process.stderr.write(r.stderr);
+    if (r.stdoutJson) process.stdout.write(JSON.stringify(r.stdoutJson));
+    process.exit(r.exitCode || 0);
+  });
+}

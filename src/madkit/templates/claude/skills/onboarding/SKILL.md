@@ -1,6 +1,6 @@
 ---
 name: onboarding
-description: "Validación del ecosistema de plantillas. Activar tras /calibrate_templates, /setup_project, al incorporar templates a un proyecto nuevo, o cuando se detecten inconsistencias entre templates desplegadas y el stack."
+description: "Validación del ecosistema de plantillas. Activar tras la skill calibrate-templates, /setup_project, al incorporar templates a un proyecto nuevo, o cuando se detecten inconsistencias entre templates desplegadas y el stack."
 ---
 
 # Validación de Ecosistema de Plantillas
@@ -11,26 +11,13 @@ description: "Validación del ecosistema de plantillas. Activar tras /calibrate_
 
 ## Paso 1: Inventario de Plantillas Desplegadas
 
-Catalogar todo lo desplegado:
-
 ```bash
-# Comandos
 ls .claude/commands/*.md 2>/dev/null
-
-# Skills (formato carpeta/SKILL.md)
 find .claude/skills/ -name "SKILL.md" 2>/dev/null
-
-# Agentes
 ls .claude/agents/*.md 2>/dev/null
 ```
 
-Construir tabla resumen:
-```
-Comandos: [N] archivos
-Skills: [M] carpetas
-Agentes: [K] archivos
-Total: [N+M+K] plantillas desplegadas
-```
+Construir tabla resumen: `Comandos: N | Skills: M | Agentes: K | Total: N+M+K`.
 
 ---
 
@@ -50,15 +37,10 @@ Detectar stack del proyecto y cruzar con plantillas desplegadas:
 ## Paso 3: Integridad de Referencias Cruzadas
 
 ```bash
-# Para cada skill/agent/command, buscar referencias a otros que no existen
 grep -rn "skill\|agent\|command\|template" .claude/commands/ .claude/skills/ .claude/agents/ 2>/dev/null
 ```
 
-Verificar que:
-- [ ] Cada `/nombre_comando` referenciado existe en `.claude/commands/`
-- [ ] Cada skill referenciado existe en `.claude/skills/nombre/SKILL.md`
-- [ ] Cada agente referenciado existe en `.claude/agents/`
-- [ ] Campo `skills:` en frontmatter de agentes apunta a skills desplegados
+Verificar: cada `/comando` existe en `.claude/commands/`; cada skill referenciada en `.claude/skills/nombre/SKILL.md`; cada agente en `.claude/agents/`; `skills:` en frontmatter apunta a skills desplegadas.
 
 | Referencia | Origen | Destino | Estado |
 |---|---|---|---|
@@ -90,20 +72,11 @@ Verificar que:
 - [ ] Descriptions bajo ~200 caracteres (alertar si >250)
 - [ ] No hay descriptions duplicadas que causen activación ambigua
 
-**Referencia de modelo esperado en agents** (8 subagents tras tasks 072+085, ver `CLAUDE.md` sección "Modelo por perfil de trabajo"):
-- `task-planner`: opus
-- `reviewer`: opus
-- `adk`: opus
-- `implementer`: sonnet
-- `doc-syncer`: sonnet
-- `researcher`: sonnet
-- `orientador`: sonnet
-- `git-guardian`: haiku
+**Referencia de modelo esperado en agents** (8 subagents, ver `CLAUDE.md` §1.4 "Asignación de modelos"): opus×1 (`reviewer`) · sonnet×5 (`task-planner`, `adk`, `implementer`, `doc-syncer`, `researcher`) · haiku×2 (`orientador`, `git-guardian`).
 
-**Skills con `context: fork` + `agent:` esperadas:**
-- `unit-testing` → `implementer`
-- `cleanup`, `cleanup-python`, `cleanup-django`, `cleanup-php` → `implementer`
-- `task-implementation-review` → `reviewer`
+**Skills con `context: fork` + `agent:` esperadas** (ver `CLAUDE.md` §1.3): `unit-testing`, `cleanup`, `cleanup-python`, `cleanup-django`, `cleanup-php` → `implementer`; `task-implementation-review`, `plan-checker`, `roadmap-reviewer`, `bugfix` → `reviewer`; `roadmap-generator` → `task-planner`.
+
+**Nota — commands vs skills:** `sync-upstream-trigger` se despliega como `.claude/commands/sync-upstream-trigger.md`, no como skill. Las referencias textuales a su nombre en otros templates no indican una skill faltante. Commands en `.claude/commands/` — excluir de la verificación de skills desplegadas: `sync-upstream-trigger`, `setup_project`, `create_task`, `task_template`.
 
 ---
 
@@ -121,52 +94,45 @@ Verificar que:
 
 ## Paso 6: Documentación Core y CLAUDE.md
 
+Inventario canónico esperado en `ai_docs/core/` (ver `CLAUDE.md` §"Inventario canónico de ai_docs/core/"): `master_idea.md`, `architecture.md`, `data_models.md`, `decisions.md` (lazy). Operativos en `ai_docs/_meta/`: `ecosystem_state.md`, `setup_report.md`.
+
 | Verificación | Estado |
 |---|---|
 | `ai_docs/` existe | PASA / FALLA |
 | `ai_docs/tasks/` existe | PASA / FALLA |
 | `ai_docs/core/` existe | PASA / FALLA / N/A |
+| `ai_docs/_meta/` existe | PASA / FALLA / N/A |
 | `ai_docs/core/master_idea.md` existe | PASA / FALLA / N/A |
-| Calibración ejecutada (`ai_docs/tasks/000_calibracion_proyecto.md`) | PASA / FALLA |
+| `ai_docs/core/architecture.md` existe | PASA / FALLA / N/A |
+| `ai_docs/core/data_models.md` existe | PASA / FALLA / N/A |
+| Sin archivos legacy en `core/` (`system_architecture.md`, `initial_data_schema.md`, `app_pages_and_functionality.md`, `wireframe.md`, `ui_theme.md`, `app_name.md`) | PASA / FALLA (listar) |
+| `ai_docs/_meta/ecosystem_state.md` existe (si calibrado) | PASA / FALLA / N/A |
+| Calibración ejecutada (`ai_docs/_meta/calibration_log.md`) | PASA / FALLA |
 | `CLAUDE.md` existe en la raíz del proyecto | PASA / FALLA |
 | `CLAUDE.md` contiene sección "Estilo de respuesta" | PASA / FALLA |
 | `CLAUDE.md` contiene sección "Estructura de carpetas (canónica en todos los proyectos)" | PASA / FALLA |
+| `CLAUDE.md` contiene sección "Inventario canónico de ai_docs/core/" | PASA / FALLA |
 | `CLAUDE.md` contiene sección "Modelo por perfil de trabajo" | PASA / FALLA |
 | `CLAUDE.md` contiene sección "Cuándo delegar a subagentes" | PASA / FALLA |
 | `CLAUDE.md` NO tiene placeholders `[entre corchetes]` pendientes | PASA / FALLA (listar los que quedan) |
 
 **Si falta CLAUDE.md:** recomendar ejecutar `/setup_project` para generarlo desde el template.
 **Si faltan secciones del template:** recomendar mergear desde `CLAUDE.md.template` sin sobrescribir el contenido existente.
-**Si hay placeholders pendientes:** recomendar ejecutar `/calibrate_templates` para rellenarlos con contexto del proyecto.
+**Si hay placeholders pendientes:** recomendar activar la skill `calibrate-templates` para rellenarlos con contexto del proyecto.
+**Si hay archivos legacy en `core/`:** listar al usuario y recomendar migración manual al inventario canónico (renombrar/fusionar) — **nunca renombrar silentemente.**
 
 ---
 
 ## Paso 7: Generar Reporte
 
-Presentar reporte consolidado:
+Tabla consolidada con una fila por verificación: `Stack vs templates | Referencias cruzadas | Frontmatter | Descriptions | Scaffolding | Docs core | Calibración` — cada celda `PASA / FALLA (N issues)`. Cierre: `RESULTADO: N PASA | M FALLA`. Listar acciones correctivas para cada FALLA por orden de prioridad.
 
+**Handoff al siguiente agente:** escribir `ai_docs/_meta/onboarding_report.md` con el reporte completo, encabezado con:
 ```
-=== Validación de Ecosistema de Plantillas ===
-
-Stack detectado: [stack]
-Plantillas desplegadas: [N] comandos | [M] skills | [K] agentes
-
-VERIFICACIÓN                          ESTADO
-─────────────────────────────────────────────
-Templates vs stack                    [PASA/FALLA]
-Referencias cruzadas                  [PASA/FALLA] ([N] rotas)
-Frontmatter consistente               [PASA/FALLA] ([N] issues)
-Descriptions sin conflicto            [PASA/FALLA]
-Protecciones scaffolding              [PASA/FALLA] ([N] faltantes)
-Documentación core                    [PASA/FALLA]
-Calibración previa                    [PASA/FALLA]
-
-RESULTADO: [N] PASA | [M] FALLA
-
-Acciones recomendadas:
-1. [acción prioritaria si hay fallos]
-2. [siguiente acción]
+generated_at: <ISO-8601>
+issues_count: <N>
 ```
+Sobrescribir si existe. `doc-syncer` lo lee en Paso 0 si `generated_at` <2h. Escribir siempre, incluso si `issues_count: 0`.
 
 ---
 

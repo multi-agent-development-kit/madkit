@@ -1,3 +1,10 @@
+---
+name: create-skill
+description: "Guía la creación de una skill nueva en .claude/skills/<nombre>/SKILL.md con frontmatter YAML, auto-activación y archivos de soporte opcionales. Activación: usuario pide 'crear skill nueva', 'añadir skill X', 'nueva skill para Y'. NO para crear skill ADK (eso es adk-skills-toolset)."
+effort: medium
+allowed-tools: Read, Glob, Grep, Edit, Write
+---
+
 # Crear Skill de Claude Code
 
 > Guía para crear skills personalizados en formato moderno `carpeta/SKILL.md`. Produce una skill desplegable en `.claude/skills/` con frontmatter YAML, auto-activación y archivos de soporte opcionales.
@@ -63,10 +70,14 @@ argument-hint: "[argumento opcional]"
 | `description` | Sí | Trigger de auto-activación — se carga siempre en contexto |
 | `argument-hint` | No | Pista de autocompletado en UI (ej. `"[archivo] [formato]"`) |
 | `allowed-tools` | No | Restringir herramientas (ej. `Read, Grep, Glob`) |
-| `context: fork` | No | Ejecutar en subagente aislado (para skills de solo lectura) |
+| `context: fork` | No | Ejecutar en subagente aislado (para skills con razonamiento profundo) |
+| `agent` | No | Nombre del subagent cuando se usa `context: fork` |
+| `effort` | No | Budget de razonamiento: `low`, `medium`, `high`, `xhigh` |
+| `paths` | No | Globs que limitan auto-activación por archivos del proyecto |
 | `user-invocable: false` | No | Ocultar del menú `/` (solo Claude puede activar) |
-| `model` | No | Override de modelo (`sonnet`, `opus`, `haiku`) |
 | `disable-model-invocation: true` | No | Solo invocación manual con `/nombre` |
+
+**IMPORTANTE:** NUNCA usar `model:` en frontmatter de skills. Causa errores de billing. Para cambiar modelo, usar `context: fork` + `agent: <subagent>`.
 
 ### Escribir Descriptions Efectivas
 
@@ -150,9 +161,9 @@ Si [otra condición]:
 | ... | ... | ... |
 ```
 
-**Referenciar otros skills** al final para prevenir confusión:
+**Referenciar otras skills** al final para prevenir confusión:
 ```markdown
-*Para [propósito relacionado pero diferente], usar `/otro-skill`.*
+*Para [propósito relacionado pero diferente], usar la skill `otro-skill`.*
 ```
 
 ---
@@ -173,12 +184,13 @@ Si [otra condición]:
 - [ ] Sin placeholders vacíos (TODO, TBD, FIXME)
 - [ ] Sin emojis en headers
 - [ ] Bloques de código balanceados
+- [ ] Sin `model:` en frontmatter (usar `context: fork` + `agent:` si se necesita modelo específico)
 - [ ] Referencia cruzada a skills relacionados al final
 
 ### Verificar Auto-Activación
 
-Tras crear el skill, verificar que Claude Code lo detecta:
-1. Abrir nueva sesión — el skill debería aparecer en autocompletado de `/`
+Tras crear la skill, verificar que Claude Code lo detecta:
+1. Abrir nueva sesión — la skill debería aparecer en autocompletado de `/`
 2. Probar con un prompt que coincida con la `description`
 3. Verificar que NO se activa con prompts de skills relacionados (exclusiones mutuas)
 
@@ -217,7 +229,7 @@ Ejecutar el comando de auditoría apropiado y presentar:
 
 ---
 
-*Para aplicar actualizaciones, usar el gestor de paquetes directamente. Este skill solo reporta.*
+*Para aplicar actualizaciones, usar el gestor de paquetes directamente. Esta skill solo reporta.*
 ```
 
 ---

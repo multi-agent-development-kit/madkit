@@ -1,3 +1,12 @@
+---
+name: testing-setup
+description: "Configura infraestructura de testing (vitest/jest/pytest/PHPUnit/Pest) detectando stack y framework existente. Activación: usuario menciona 'configurar tests', 'setup testing', o agente detecta proyecto sin framework testing. NO para escribir tests (eso es unit-testing skill)."
+context: fork
+agent: implementer
+effort: high
+allowed-tools: Read, Grep, Glob, Edit, Write, Bash
+---
+
 # Setup de Infraestructura de Testing
 
 > **Propósito:** Setup one-shot idempotente de infraestructura de testing. Instala framework, coverage, pre-commit hooks y CI/CD.

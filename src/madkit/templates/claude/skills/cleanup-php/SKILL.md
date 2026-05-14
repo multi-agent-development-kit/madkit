@@ -37,14 +37,22 @@ composer install                           # instalar desde lock
 
 ---
 
-## Scope de Limpieza
+## Scope y Prioridad de Limpieza
 
-- **Solo archivos de la tarea actual.** No expandir limpieza a módulos adyacentes. Issues fuera del scope → documentar como nota, no actuar.
-- **Antes de eliminar código "muerto":** Verificar que no se use vía service container, facades, event listeners, middleware, route model binding u otros mecanismos indirectos de Laravel/PHP. En caso de duda → NO eliminar, preguntar al usuario.
+> Reglas de scope universales: ver `cleanup/SKILL.md` §Scope de Limpieza.
+
+**PHP/Laravel específico:** antes de eliminar código "muerto", verificar que no se use vía service container, facades, event listeners, middleware o route model binding. En duda → NO eliminar, preguntar.
+
+**Prioridad:**
+
+1. Sintaxis PHP — `php -l` limpio
+2. Análisis estático — PHPStan nivel declarado
+3. Código muerto confirmado — solo en archivos de la tarea
+4. Type safety — properties/params/returns sin tipo
+5. Rendimiento — N+1, eager loading, queries sin optimizar
+6. Dependencias — no utilizadas, versiones con vulnerabilidades
 
 ## Verificaciones Obligatorias (GATE)
-
-**Ejecuta INMEDIATAMENTE después de crear o editar cualquier archivo PHP:**
 
 ```bash
 php -l filename.php                        # 1º: Sintaxis
@@ -60,37 +68,18 @@ php artisan test                           # 4º: Tests (Laravel)
 
 ## PHP 8+ Moderno (OBLIGATORIO)
 
-### `declare(strict_types=1)` en cada archivo
+Cada archivo PHP requiere `declare(strict_types=1)` como primera instrucción tras `<?php`.
 
-```php
-<?php
-declare(strict_types=1);
+**Características obligatorias:**
 
-namespace App\Services;
-// ...
-```
-
-### Constructor Promotion + Readonly + Enums
-
-```php
-class User
-{
-    public function __construct(
-        public readonly int $id,
-        public string $name,
-        public UserStatus $status = UserStatus::Active,
-        public ?string $bio = null,
-    ) {}
-
-    public function getRoleName(): string
-    {
-        return match ($this->role) {
-            UserRole::Admin => 'Administrator',
-            UserRole::User => 'User',
-        };
-    }
-}
-```
+| Patrón | Descripción |
+|--------|-------------|
+| Constructor Promotion | `public readonly int $id` en la firma del constructor |
+| Readonly properties | Para DTOs y value objects inmutables |
+| Enums (8.1+) | Reemplazar magic strings y constantes de estado |
+| Match expressions | Reemplazar switch/case para transformaciones de valor |
+| Named arguments | Para claridad en llamadas con múltiples parámetros opcionales |
+| Nullsafe operator `?->` | Para cadenas de acceso a objetos nullable |
 
 ---
 
@@ -108,37 +97,9 @@ class User
 
 ## Patrones Laravel Específicos
 
-### Form Requests para validación
+**Form Requests:** clase que extiende `FormRequest` con método `rules(): array` retornando reglas de validación. Usar `Password::min(8)->mixedCase()->numbers()` para contraseñas. Inyectar el Form Request en el método del controller — Laravel valida automáticamente antes de ejecutar.
 
-```php
-class RegisterUserRequest extends FormRequest
-{
-    public function rules(): array
-    {
-        return [
-            'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'unique:users,email'],
-            'password' => ['required', 'confirmed', Password::min(8)->mixedCase()->numbers()],
-        ];
-    }
-}
-```
-
-### Query Scopes para querysets reutilizables
-
-```php
-class Post extends Model
-{
-    public function scopePublished(Builder $query): void
-    {
-        $query->where('status', 'published')
-              ->whereNotNull('published_at')
-              ->where('published_at', '<=', now());
-    }
-}
-
-// Uso: Post::published()->recent()->get();
-```
+**Query Scopes:** método `scope<Nombre>(Builder $query): void` en el modelo para encapsular querysets reutilizables. Encadenar con otros scopes: `Post::published()->recent()->get()`.
 
 ---
 

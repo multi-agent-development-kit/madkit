@@ -1,28 +1,36 @@
+---
+name: calibrate-templates
+description: "Adapta templates desplegadas (.claude/{commands,skills,agents}/) al stack del proyecto destino tras setup_project o cuando hay drift. Activación: usuario menciona 'calibrar templates', 'adaptar al proyecto', o post-setup_project. NO para sync (sync-upstream-trigger primero)."
+context: fork
+agent: task-planner
+effort: xhigh
+allowed-tools: Read, Grep, Glob, Edit, Write, Bash
+---
+
 # Flujo de Trabajo de Calibración de Plantillas
 
 > **Propósito:** Analizar el contexto completo de un proyecto destino y adaptar quirúrgicamente todas las plantillas desplegadas — eliminando las irrelevantes para el stack, actualizando referencias y rutas obsoletas, pre-llenando valores conocidos e inyectando reglas específicas del proyecto para que cada plantilla, agente y skill funcione de forma óptima desde el inicio.
 
 > **Cuándo usar:** Ejecutar una vez después de copiar plantillas a un nuevo proyecto. Re-ejecutar cuando el proyecto cambie significativamente (nuevos componentes del stack, refactorizaciones mayores, cambios de equipo).
 
-> **Prerrequisito recomendado:** Ejecutar `setup_project` primero para preparar la infraestructura de `ai_docs/`. Si existen documentos en `ai_docs/core/` (master_idea, data_schema, architecture), la calibración será más precisa al inyectar contexto del proyecto en Fase 3.3.
+> **Prerrequisito recomendado:** Ejecutar `setup_project` primero para preparar la infraestructura de `ai_docs/`. Si existen documentos en `ai_docs/core/` (master_idea, architecture, data_models), la calibración será más precisa al inyectar contexto del proyecto en Fase 3.3.
 
 > **Sin core docs:** La calibración funciona pero se limita a stack detection y eliminación de plantillas irrelevantes. La inyección de contexto (Fase 3.3) será superficial — solo datos del manifest y git, sin contexto de dominio.
 
-> **Re-calibración:** Si la task 000 ya existe, NO crear un archivo nuevo. Añadir una nueva entrada al Historial de Calibraciones con la fecha actual y documentar los cambios incrementales respecto a la calibración anterior.
+> **Re-calibración:** Si `ai_docs/_meta/calibration_log.md` ya existe, NO crear un archivo nuevo. Añadir una nueva entrada al Historial de Calibraciones con la fecha actual y documentar los cambios incrementales respecto a la calibración anterior.
 
-> **Flujo recomendado:** `setup_project` → `core_templates (00-08)` → `calibrate_templates`
+> **Flujo recomendado:** `setup_project` → `core_templates (00-08)` → `calibrate-templates`
 
 ---
 
-## Fase 0: Inicializar Task 000 de Calibración
+## Fase 0: Inicializar Calibration Log
 
-<!-- AI Agent: El número 000 está RESERVADO para calibración. No forma parte de la secuencia normal de tareas (001, 002...). Este paso se ejecuta ANTES de cualquier análisis o modificación. -->
+<!-- AI Agent: El calibration log vive en ai_docs/_meta/ (metadata operativa, no tarea). Este paso se ejecuta ANTES de cualquier análisis o modificación. -->
 
-### 0.0 Detectar modo de calibración (NUEVO — task 074)
-
+### 0.0 Detectar modo de calibración
 <!-- AI Agent: Antes de cualquier otra cosa, decidir si esta calibración es FULL-PASS (re-recolectar todo) o INCREMENTAL (solo adaptar lo modificado por el último sync). El modo cambia qué fases se ejecutan completas. -->
 
-**Argumentos del comando:**
+**Argumentos de la skill:**
 - `--full` → forzar full-pass (siempre)
 - `--changed-only` → forzar incremental (requiere `.claude/.sync_report.txt`)
 - sin argumentos → auto-detección (recomendado)
@@ -34,7 +42,7 @@
    NO → modo = FULL-PASS (es una calibración inicial o manual, no post-sync)
    SÍ → continuar
 
-2. ¿Existe ai_docs/tasks/000_calibracion_proyecto.md?
+2. ¿Existe ai_docs/_meta/calibration_log.md?
    NO → modo = FULL-PASS (nunca se ha calibrado, sync no es suficiente contexto)
    SÍ → continuar
 
@@ -60,19 +68,39 @@ Modo de calibración: [INCREMENTAL | FULL-PASS]
 Razón: [auto-detección | --full forzado | --changed-only forzado | sin sync_report previo | ...]
 ```
 
-**Si modo INCREMENTAL:** PUNTO DE ESPERA — confirmar con el usuario antes de continuar. La calibración incremental es más rápida pero asume que el stack y las áreas de riesgo no han cambiado significativamente desde la última calibración.
+**Si modo INCREMENTAL:** Proceder automáticamente. Reportar al usuario el modo y la razón antes de iniciar — la calibración incremental es más rápida y asume que el stack y las áreas de riesgo no han cambiado significativamente desde la última calibración.
 
-**Si `--changed-only` se invocó pero no existe `.sync_report.txt`:** ERROR claro: "Sin `.sync_report.txt`. Ejecutar `/sync_upstream` primero o usar `/calibrate_templates --full`."
+**Si `--changed-only` se invocó pero no existe `.sync_report.txt`:** ERROR claro: "Sin `.sync_report.txt`. Ejecutar la skill `sync-upstream-trigger` primero o usar `calibrate-templates --full`."
 
-### 0.1 Crear o Localizar Task 000
+### 0.1 Crear o Localizar Calibration Log
 
-1. Verificar si existe `ai_docs/tasks/000_calibracion_proyecto.md`
+1. Verificar si existe `ai_docs/_meta/calibration_log.md`
 2. Si existe: se actualizará con los resultados de esta calibración (re-calibración)
 3. Si NO existe: crear el archivo con la estructura base de la sección 3.5
 
 ### 0.2 Registrar Estado ANTES de Calibración
 
-Documentar en task 000 el inventario actual antes de realizar cambios:
+<!-- AI Agent: Leer .claude/.ai_docs_path al inicio para resolver AI_DOCS_ROOT.
+     Usar AI_DOCS_ROOT como prefijo de TODAS las rutas de ai_docs/ en Fases 0/2/3/3.5/3.6.
+     En proyectos canónicos el archivo no existe y AI_DOCS_ROOT = ./ai_docs (cero regresión). -->
+
+```bash
+# Detectar ruta base de ai_docs/ (split-workspace support)
+if [ -f ".claude/.ai_docs_path" ]; then
+  # Leer primera línea no comentada, limpiar BOM y CRLF
+  AI_DOCS_ROOT=$(grep -v '^#' .claude/.ai_docs_path | head -1 | tr -d '\r' | sed 's/[[:space:]]*$//')
+  if [ -z "$AI_DOCS_ROOT" ] || [ ! -d "$AI_DOCS_ROOT" ]; then
+    echo "WARN: .claude/.ai_docs_path no válido o directorio inexistente — usando ./ai_docs como fallback"
+    AI_DOCS_ROOT="./ai_docs"
+  fi
+else
+  AI_DOCS_ROOT="./ai_docs"
+fi
+echo "AI_DOCS_ROOT=$AI_DOCS_ROOT"
+# Usar $AI_DOCS_ROOT como prefijo en todos los accesos a ai_docs/ en esta calibración.
+```
+
+Documentar en calibration log el inventario actual antes de realizar cambios:
 
 ```bash
 # Inventario actual de plantillas desplegadas
@@ -80,41 +108,40 @@ ls .claude/commands/*.md 2>/dev/null
 find .claude/skills/ -name "SKILL.md" 2>/dev/null
 ls .claude/agents/*.md 2>/dev/null
 
-# Core docs disponibles
-ls ai_docs/core/*.md 2>/dev/null
+# Core docs disponibles (usando AI_DOCS_ROOT detectado arriba)
+ls "$AI_DOCS_ROOT/core/"*.md 2>/dev/null
 
 # Estado del repositorio
 git rev-parse --short HEAD 2>/dev/null
 date -u +"%Y-%m-%dT%H:%M:%SZ"
 ```
 
-Registrar en task 000:
+Registrar en calibration log:
 - Plantillas desplegadas (conteo y lista)
 - Core docs disponibles (lista o "ninguno")
 - Fecha y Git HEAD actual
 
 ### 0.3 Verificar Disponibilidad de Core Docs
 
-1. Listar archivos en `ai_docs/core/`
-2. Si existen documentos P0 (`master_idea.md`, `initial_data_schema.md`): extraer contexto para inyección enriquecida en Fase 3.3:
+1. Listar archivos en `ai_docs/core/` (no recursive — NO entrar en `_meta/`)
+2. Si existen documentos P0 canónicos (`master_idea.md`, `architecture.md`, `data_models.md`): extraer contexto para inyección enriquecida en Fase 3.3:
    - De `master_idea.md`: descripción del proyecto, usuarios objetivo, funcionalidades principales
-   - De `initial_data_schema.md`: entidades, relaciones, campos clave
-   - De `system_architecture.md`: patrones de diseño, capas, servicios
-   - De `setup_report.md`: perfil del stack (si se ejecutó `setup_project` antes)
-3. Si NO existen: registrar en task 000 "Calibración sin core docs — inyección de contexto limitada a stack detection"
-4. Recomendar ejecutar el pipeline de `core_templates` si faltan documentos P0
+   - De `data_models.md`: entidades, relaciones, campos clave
+   - De `architecture.md`: patrones de diseño, capas, servicios, stack
+   - De `ai_docs/_meta/setup_report.md`: perfil del stack (si se ejecutó `setup_project` antes)
+3. Si NO existen: registrar en calibration log "Calibración sin core docs — inyección de contexto limitada a stack detection"
+4. Recomendar ejecutar el pipeline de `core_templates/` (per-proyecto) si faltan documentos P0
 
 ---
 
 ## Fase 1: Recolección de Contexto del Proyecto
 
-### 1.0 Skip de Fase 1 si modo incremental (NUEVO — task 074)
-
-<!-- AI Agent: En modo INCREMENTAL, el contexto del stack ya está en Task 000 desde la última calibración. No re-recolectar — leerlo de allí. Solo se ejecuta el inventario actual (1.2) para detectar archivos nuevos del sync. -->
+### 1.0 Skip de Fase 1 si modo incremental
+<!-- AI Agent: En modo INCREMENTAL, el contexto del stack ya está en el calibration log desde la última calibración. No re-recolectar — leerlo de allí. Solo se ejecuta el inventario actual (1.2) para detectar archivos nuevos del sync. -->
 
 **Si modo INCREMENTAL (decidido en Fase 0.0):**
 
-1. Leer Perfil del Stack desde la última entrada del Historial de Calibraciones en Task 000
+1. Leer Perfil del Stack desde la última entrada del Historial de Calibraciones en el calibration log
 2. Leer áreas de riesgo desde la misma fuente
 3. **Saltar §1.1, §1.3, §1.4, §1.5** (recolección desde cero)
 4. **Ejecutar §1.2** (inventario actual de plantillas desplegadas) — necesario para detectar archivos nuevos del sync
@@ -279,12 +306,18 @@ El frontmatter YAML de skills (`SKILL.md`) y agentes es el mecanismo de auto-act
 - **`description:`** — Trigger de activación. NUNCA eliminar. Se puede ENRIQUECER con contexto del proyecto pero manteniendo los triggers originales intactos
 - **`skills:`** — Lista de skills precargadas por agentes (git-guardian, adk). NUNCA eliminar skills de esta lista; se pueden AÑADIR skills adicionales del proyecto
 - **`model:` (SOLO en subagents `.claude/agents/*.md`)** — Asignación de modelo por perfil de trabajo (opus/sonnet/haiku). NUNCA eliminar ni modificar — decisión arquitectónica. Matriz actual (8 subagents):
-  - `task-planner=opus`, `reviewer=opus`, `adk=opus` (planificación / revisión / arquitectura crítica)
-  - `implementer=sonnet`, `doc-syncer=sonnet`, `researcher=sonnet`, `orientador=sonnet` (ejecución / docs / investigación / orientación a usuarios no técnicos)
-  - `git-guardian=haiku` (orquestación mecánica)
+  - `reviewer=opus` (revisión correlacionada + gate adversarial plan-checker y bugfix)
+  - `task-planner=sonnet`, `adk=sonnet`, `doc-syncer=sonnet`, `researcher=sonnet`, `implementer=sonnet` (planificación, orquestación, docs, investigación, ejecución de planes)
+  - `orientador=haiku`, `git-guardian=haiku` (orientación, ops git mecánicas)
   Si el usuario quiere cambiar un modelo por coste, debe hacerse en el repo de plantillas y propagarse vía sync, no por calibración.
+
+**Verificación de coherencia model table ↔ agents (ejecutar siempre, incluso en modo INCREMENTAL):**
+Para cada fila de la tabla "Modelo por perfil de trabajo" en `CLAUDE.md`, leer el campo `model:` del agent desplegado correspondiente en `.claude/agents/`. Si difieren → actualizar la celda de `CLAUDE.md` para que refleje el valor del agent (el agent es la fuente de verdad para el modelo real; la tabla en CLAUDE.md es documentación derivada). Registrar en `calibration_log.md`:
+`[MODEL SYNC] <agent>: CLAUDE.md tenía <valor-viejo>, corregido a <valor-agent>`.
+Si CLAUDE.md no tiene tabla de modelos → emitir WARN en calibration_log y continuar (advisory, no bloqueante).
+
 - **`effort:`** — si presente en subagent o skill, CONSERVAR. Es ajuste por perfil de trabajo, no por proyecto.
-- **`context: fork` + `agent:`** en skills — CONSERVAR. Skills con `context: fork` corren en sesión aislada del subagent declarado en `agent:`. Si encuentras una skill con `context: fork` y el subagent referenciado en `agent:` NO está desplegado en `.claude/agents/`, eliminar `context: fork` + `agent:` (la skill funcionará heredando modelo del invocador) y reportar en task 000. **Las skills NO declaran `model:`** directamente: si encuentras `model:` en el frontmatter de una skill, ELIMÍNALO — usar `context: fork` + `agent:` en su lugar.
+- **`context: fork` + `agent:`** en skills — CONSERVAR. Skills con `context: fork` corren en sesión aislada del subagent declarado en `agent:`. Si encuentras una skill con `context: fork` y el subagent referenciado en `agent:` NO está desplegado en `.claude/agents/`, eliminar `context: fork` + `agent:` (la skill funcionará heredando modelo del invocador) y reportar en el calibration log. **Las skills NO declaran `model:`** directamente: si encuentras `model:` en el frontmatter de una skill, ELIMÍNALO — usar `context: fork` + `agent:` en su lugar.
 - **`paths:`** — globs que limitan auto-activación por archivos. CONSERVAR si presente.
 - **`memory:`** en subagents (valores: `user`, `project`, `local`) — CONSERVAR, es decisión arquitectónica (p.ej. `doc-syncer` usa `project`).
 - **`disable-model-invocation:`**, **`user-invocable:`**, **`allowed-tools:`**, **`argument-hint:`** — Si están presentes, CONSERVAR. Se pueden añadir si se necesitan
@@ -350,9 +383,9 @@ description: "Hacer commits en el proyecto Django."
    ```
 
 2. Si se detectan 2+ stacks: conservar plantillas de TODOS los stacks presentes
-3. Si hay duda sobre si un stack está en uso: preguntar al usuario antes de eliminar
+3. Si hay duda sobre si un stack está en uso: conservar (safe default — la eliminación es irreversible)
 
-**Ejemplo:** Un proyecto con `manage.py` (Django) Y `package.json` con Next.js debe conservar TANTO `task_template_django` COMO `task_template_typescript` (y `task_template` como genérico).
+**Ejemplo:** Un proyecto con `manage.py` (Django) Y `package.json` con Next.js debe conservar TANTO `references/task_template_django.md` COMO `references/task_template_typescript.md` (y `task_template.md` como genérico).
 
 ### Validación de Dependencias Antes de Eliminación
 
@@ -438,8 +471,7 @@ grep -rn "logger\.\|logging\.\|console\.\(log\|error\|warn\)" --include="*.py" -
 
 <!-- AI Agent: Esta es la fase central. Vas a modificar quirúrgicamente los archivos de plantilla reales desplegados en este proyecto. -->
 
-### 3.0 Determinar archivos a adaptar (NUEVO — task 074)
-
+### 3.0 Determinar archivos a adaptar
 <!-- AI Agent: En modo INCREMENTAL, restringir Fase 3 a los archivos listados en .sync_report.txt. En modo FULL-PASS, todas las plantillas conservadas son candidatas. -->
 
 **Si modo INCREMENTAL:**
@@ -448,8 +480,8 @@ grep -rn "logger\.\|logging\.\|console\.\(log\|error\|warn\)" --include="*.py" -
 2. Listar archivos marcados como `[NUEVO]` y `[MODIFICADO]`
 3. Restringir §3.2 (referencias) y §3.3 (inyección de contexto) a esos archivos
 4. **Saltar §3.1** (eliminación) — el sync no elimina archivos, solo añade/modifica
-5. **Saltar §3.4** (calibración ADK específica) si ningún archivo de la lista está en `claude-templates/skills/adk-*/` o `claude-templates/commands/task_template_adk.md`/`adk_orchestrator_template.md`/`adk-agent.md`
-6. **Saltar §3.5** parcialmente — Task 000 SÍ se actualiza pero con entrada de tipo `(INCREMENTAL)` — ver plantilla en §3.5
+5. **Saltar §3.4** (calibración ADK específica) si ningún archivo de la lista está en `.claude/skills/adk-*/` o `.claude/commands/references/task_template_adk.md`/`.claude/agents/adk-agent.md`
+6. **Saltar §3.5** parcialmente — el calibration log SÍ se actualiza pero con entrada de tipo `(INCREMENTAL)` — ver plantilla en §3.5
 
 **Si modo FULL-PASS:**
 - Sin restricciones, todas las plantillas conservadas tras §3.1 son candidatas para §3.2, §3.3, §3.4
@@ -459,21 +491,19 @@ grep -rn "logger\.\|logging\.\|console\.\(log\|error\|warn\)" --include="*.py" -
 
 **Matriz de relevancia stack-plantilla:**
 
-**Comandos (commands/):**
+**Comandos (commands/) y References (commands/references/):**
 
-| Comando | Django | Python | TypeScript/Next.js | Web/JS | ADK | WordPress |
+| Archivo | Django | Python | TypeScript/Next.js | Web/JS | ADK | WordPress |
 |---------|--------|--------|--------------------|--------|-----|-----------|
-| `task_template_django` | ✅ | — | — | — | — | — |
-| `task_template_python` | ✅ | ✅ | — | — | — | — |
-| `task_template_typescript` | — | — | ✅ | — | — | — |
-| `task_template` (genérico) | ✅ | ✅ | ✅ | ✅ | — | ✅ |
-| `task_template_php` | — | — | — | ✅ | — | ✅ |
-| `task_template_adk` | — | — | — | — | ✅ | — |
-| `adk_orchestrator_template` | — | — | — | — | ✅ | — |
-| `task_template_wordpress` | — | — | — | — | — | ✅ |
-| `setup_project` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `testing_setup` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `sync_upstream` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `references/task_template_django.md` | ✅ | — | — | — | — | — |
+| `references/task_template_python.md` | ✅ | ✅ | — | — | — | — |
+| `references/task_template_typescript.md` | — | — | ✅ | — | — | — |
+| `task_template.md` (genérico, command) | ✅ | ✅ | ✅ | ✅ | — | ✅ |
+| `references/task_template_php.md` | — | — | — | ✅ | — | ✅ |
+| `references/task_template_adk.md` | — | — | — | — | ✅ | — |
+| `references/task_template_wordpress.md` | — | — | — | — | — | ✅ |
+| `setup_project.md` (command) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `sync-upstream-trigger.md` (command) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 
 **Skills (skills/\*/SKILL.md):**
 
@@ -495,8 +525,13 @@ grep -rn "logger\.\|logging\.\|console\.\(log\|error\|warn\)" --include="*.py" -
 | `adk-evaluation-testing/` | — | — | — | — | ✅ | — |
 | `adk-skills-toolset/` | — | — | — | — | ✅ | — |
 | `unit-testing/` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `roadmap-generator/` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `scroll-stop-builder/` | — | — | ✅ | ✅ | — | ✅ |
 | `scroll-stop-web-animations/` | — | — | ✅ | ✅ | — | ✅ |
+| `adk_orchestrator_template.md` (command) | — | — | — | — | ✅ | — |
+| `calibrate-templates/` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `testing-setup/` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `create-skill/` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 
 **Agentes (agents/) — 8 subagents tras tasks 072+085:**
 
@@ -512,15 +547,15 @@ grep -rn "logger\.\|logging\.\|console\.\(log\|error\|warn\)" --include="*.py" -
 | `adk-agent` → `adk` | — | — | — | — | ✅ | — |
 
 **Plantillas universales (conservar siempre):**
-- Comandos: `create_task`, `calibrate_templates`, `create_skill_template`, `setup_project`, `testing_setup`
-- Skills: `bugfix/`, `commit/`, `pr/`, `diff/`, `task-implementation-review/`, `generate-diagram/`, `worktree-management/`, `unit-testing/`, `onboarding/`
+- Comandos: `create_task`, `setup_project`, `task_template`, `sync-upstream-trigger.md`
+- Skills: `bugfix/`, `commit/`, `pr/`, `diff/`, `task-implementation-review/`, `generate-diagram/`, `worktree-management/`, `unit-testing/`, `onboarding/`, `roadmap-generator/`, `calibrate-templates/`, `testing-setup/`, `create-skill/`
 - Agentes: `task-agent`, `reviewer-agent`, `git-guardian-agent`, `implementer-agent`, `doc-syncer-agent`, `researcher-agent`, `orientador-agent`
 
 **Acciones:**
 1. Cruzar el stack detectado contra las tres matrices de relevancia (comandos, skills, agentes)
 2. Listar plantillas a eliminar (las marcadas con `—` para el stack detectado)
-3. **Presentar lista de eliminación al usuario para confirmación** — nunca eliminar sin aprobación
-4. Eliminar archivos confirmados de `.claude/commands/`, `.claude/skills/` (carpeta completa del skill) y `.claude/agents/`
+3. Eliminar directamente de `.claude/commands/`, `.claude/skills/` (carpeta completa del skill) y `.claude/agents/`
+4. Registrar lista de eliminaciones en calibration log
 
 ### 3.2 Actualizar Referencias y Rutas
 <!-- AI Agent: Escanear plantillas restantes buscando referencias obsoletas y corregirlas -->
@@ -549,11 +584,12 @@ grep -rn "task_template\|cleanup\|migration\|drizzle\|django\|adk\|wordpress" .c
 - Sección **"Prohibiciones del proyecto"**: leer reglas "NUNCA"/"SIEMPRE" de documentos core o de un CLAUDE.md pre-existente y añadirlas
 - Sección **"Convenciones del proyecto"**: inferir imports, naming, formato de commits del historial git
 - Sección **"Comandos frecuentes"**: pre-llenar con comandos reales (`pytest`, `npm test`, etc.) extraídos de `package.json` scripts, `pyproject.toml` tool section, Makefile
-- **NUNCA modificar** las 4 secciones transversales de CLAUDE.md.template — son guidance transversal que no depende del proyecto:
+- **NUNCA modificar** las 5 secciones transversales de CLAUDE.md (heredadas del template base) — son guidance transversal que no depende del proyecto:
   1. "Estilo de respuesta"
-  2. "Estructura de carpetas (canónica en todos los proyectos)"
-  3. "Modelo por perfil de trabajo"
-  4. "Cuándo delegar a subagentes"
+  2. "Principios de Ingeniería" (P1-P4, fuente única literal en inglés)
+  3. "Estructura de carpetas (canónica en todos los proyectos)"
+  4. "Modelo por perfil de trabajo"
+  5. "Cuándo delegar a subagentes"
 
 **Para cada plantilla de tarea (commands/):**
 - Pre-llenar la sección de detección de stack con el stack real detectado, versiones y gestor de paquetes
@@ -628,7 +664,7 @@ echo "Samples commit: $(git -C ai_docs/refs/adk-samples rev-parse --short HEAD 2
 #    Ver skill `adk-skills-toolset` para decisión y compliance.
 ```
 
-**Tras importar:** Registrar en task 000 los commits de ambos repos y la fecha de importación.
+**Tras importar:** Registrar en el calibration log los commits de ambos repos y la fecha de importación.
 
 **Calibrar plantillas ADK:**
 
@@ -638,12 +674,12 @@ echo "Samples commit: $(git -C ai_docs/refs/adk-samples rev-parse --short HEAD 2
    - [ ] Pre-llenar versión del SDK en referencias
    - [ ] Verificar campo `skills:` en frontmatter — las 7 skills ADK deben estar desplegadas en `.claude/skills/`
 
-2. **`task_template_adk` (comando):**
+2. **`references/task_template_adk.md` (reference, cargada por task-planner):**
    - [ ] Actualizar pre-vuelo con la versión real de Python y SDK del proyecto
    - [ ] Pre-llenar rutas de agent.py y __init__.py del proyecto real
    - [ ] Actualizar estructura de directorios con la estructura real del proyecto ADK
 
-3. **`adk_orchestrator_template` (comando):**
+3. **`adk_orchestrator_template.md` (command):**
    - [ ] Verificar que el proyecto usa el patrón de documentos de diseño (`ai_docs/tasks/XXX_DESIGN_*.md`)
    - [ ] Pre-llenar modelo predeterminado del proyecto (gemini-2.5-flash / gemini-2.5-pro)
    - [ ] Actualizar estructura de proyecto ADK en sección 15 con la estructura real
@@ -682,19 +718,34 @@ echo "Samples commit: $(git -C ai_docs/refs/adk-samples rev-parse --short HEAD 2
 - [ ] Estructura de proyecto documentada en plantillas coincide con la estructura real
 - [ ] No hay referencias a patrones ADK obsoletos (imports incorrectos, APIs deprecated)
 
-### 3.5 Documentar Calibración en Task 000
+### 3.5 Documentar Calibración en Calibration Log y ecosystem_state.md
 
-**Salida:** `ai_docs/tasks/000_calibracion_proyecto.md`
+<!-- AI Agent: El output de calibración se divide en DOS destinos con responsabilidades distintas:
+- Calibration Log (ai_docs/_meta/calibration_log.md): LOG DE OPERACIÓN — qué se calibró, cuándo, qué cambió, historial acumulativo.
+- ecosystem_state.md (ai_docs/_meta/ecosystem_state.md): ESTADO PERSISTENTE — inventario actual, hooks activos, stack calibrado, última calibración.
+Esta separación permite que core-context-loader lea el estado del ecosistema sin parsear el log histórico de operaciones. -->
 
-<!-- AI Agent: Documentar la calibración en la task 000 (creada en Fase 0). Si es re-calibración, añadir una nueva entrada al historial. El número 000 está RESERVADO — no forma parte de la secuencia normal de tareas. -->
+#### Destino A — Calibration Log: Log de Operación
+
+**Archivo:** `ai_docs/_meta/calibration_log.md`
+
+**Propósito:** Historial acumulativo de operaciones de calibración. No se sobreescribe — cada calibración añade una entrada al historial.
+
+**Cuándo escribir en el calibration log:**
+- Fecha y modo de calibración (FULL-PASS / INCREMENTAL).
+- Lista de templates modificados con resumen del cambio.
+- Decisiones de adaptación al stack (por qué se eligió X sobre Y).
+- Archivos eliminados y razón (solo FULL-PASS).
+- Referencias a `ecosystem_state.md` para el estado actual (no duplicar inventario en calibration log).
 
 **Si es primera calibración:** Crear el documento con la estructura completa.
 **Si es re-calibración:** Añadir nueva entrada bajo `## Historial de Calibraciones` con la fecha actual.
 
 ```markdown
-# Task 000: Calibración del Proyecto
-<!-- Auto-generado por calibrate_templates -->
+# Calibration Log
+<!-- Auto-generado por calibrate-templates -->
 <!-- Re-ejecutar calibración cuando el proyecto cambie significativamente -->
+<!-- Estado actual del ecosistema: ver ai_docs/_meta/ecosystem_state.md -->
 
 ## Estado
 - **Estado:** Completado
@@ -722,31 +773,12 @@ echo "Samples commit: $(git -C ai_docs/refs/adk-samples rev-parse --short HEAD 2
 - **Modificados:** [lista de archivos modificados con resumen de 1 línea de qué cambió]
 - **Contexto inyectado:** [resumen de valores pre-llenados en plantillas]
 - **Reutilizado de calibración previa (solo INCREMENTAL):** Stack, áreas de riesgo, conteos preservados — ver entrada anterior
+- **ecosystem_state.md:** [actualizado FULL-PASS / actualizado parcial INCREMENTAL / creado nuevo]
 
 #### Estado DESPUÉS
 
-**Perfil del Stack:**
-- **Lenguaje:** [versión exacta]
-- **Framework:** [versión exacta]
-- **Base de Datos:** [tipo + versión]
-- **Gestor de Paquetes:** [nombre + versión]
-- **Framework de API:** [nombre + versión]
-- **Cola de Tareas:** [nombre o "Ninguno"]
-- **Caché:** [nombre o "Ninguno"]
-- **Testing:** [framework + ubicación de configuración]
-- **Linting:** [herramienta + ubicación de configuración]
-- **Verificación de Tipos:** [herramienta + ubicación de configuración]
-
-**Plantillas Desplegadas Tras Calibración:**
-
-*Comandos (.claude/commands/ — planificación de tareas):*
-- [lista de archivos de comandos restantes]
-
-*Skills (.claude/skills/*/SKILL.md — flujos operativos):*
-- [lista de carpetas de skills restantes]
-
-*Agentes (.claude/agents/ — especialistas):*
-- [lista de archivos de agentes restantes]
+> El inventario completo de templates desplegados y el stack calibrado se encuentran en `ai_docs/_meta/ecosystem_state.md`.
+> Esta sección registra las decisiones y áreas de riesgo del proyecto — información de contexto de ingeniería, no de inventario.
 
 **Reglas del Proyecto (extraídas de CLAUDE.md):**
 - Prohibiciones: [lista]
@@ -764,18 +796,139 @@ echo "Samples commit: $(git -C ai_docs/refs/adk-samples rev-parse --short HEAD 2
 - [ ] Campo `skills:` en agentes apunta a skills desplegadas
 - [ ] Valores pre-llenados correctos
 - [ ] Sin información sensible incluida
+- [ ] ecosystem_state.md actualizado (ver §3.6)
 
 **Metadatos:**
 - **Plantillas modificadas:** [conteo]
 - **Plantillas eliminadas:** [conteo]
 ```
 
+#### Destino B — ecosystem_state.md: Estado Persistente
+
+**Archivo:** `ai_docs/_meta/ecosystem_state.md` (en proyecto destino)
+
+**Propósito:** Estado actual del ecosistema de templates. Leído por `core-context-loader` en cada SessionStart. Reemplaza la sección correspondiente en cada calibración FULL-PASS; actualización parcial en INCREMENTAL.
+
+**Cuándo escribir en ecosystem_state.md:**
+- Inventario actual de templates desplegados (N commands, M skills, K agentes — con lista).
+- Hooks activos (flags `true` en `.claude/hooks/config.json`).
+- Stack calibrado (framework, versión, gestor de paquetes, decisiones de modelo).
+- Fecha y modo de última calibración (reemplaza el valor anterior — no acumula historial).
+
+Ver §3.6 para las reglas de sincronización (cuándo crear, cuándo actualizar, qué preservar).
+
+---
+
+### 3.6 Sincronización con ecosystem_state.md
+
+<!-- AI Agent: Reglas que gobiernan cómo calibrate-templates mantiene ai_docs/_meta/ecosystem_state.md en el proyecto destino. Este archivo es el estado persistente del ecosistema — no el log de operación (que vive en calibration_log.md). -->
+
+#### Reglas de sincronización
+
+**Regla 1 — Si `ecosystem_state.md` no existe:**
+
+Crearlo usando la plantilla minimal de 4 secciones (igual que `setup_project` Fase 5.3), rellenando inmediatamente todas las secciones con los datos de esta calibración. No dejar placeholders si los datos están disponibles.
+
+```bash
+# Verificar existencia antes de escribir
+if [ ! -f "ai_docs/_meta/ecosystem_state.md" ]; then
+  echo "ecosystem_state.md no encontrado — creando y rellenando desde calibración actual."
+fi
+```
+
+**Regla 2 — Si `ecosystem_state.md` existe (update incremental):**
+
+Actualizar SOLO las secciones gestionadas por `calibrate-templates`. No borrar secciones que el usuario haya añadido manualmente.
+
+**Regla 3 — Tras FULL-PASS:**
+
+Reescribir las 4 secciones gestionadas con los datos actuales:
+- `## Inventario` → lista completa de templates desplegados tras la calibración.
+- `## Hooks Activos` → flags `true` leídas de `.claude/hooks/config.json` (o "Ninguno configurado" si el archivo no existe).
+- `## Stack Calibrado` → perfil completo del stack detectado en Fase 1.3 (lenguaje, framework, BBDD, gestor de paquetes, testing, linting).
+- `## Última Calibración` → `[FECHA ISO] — FULL-PASS — git HEAD: [SHA corto]`.
+
+**Regla 4 — Tras INCREMENTAL:**
+
+Actualizar solo:
+- `## Última Calibración` → `[FECHA ISO] — INCREMENTAL — git HEAD: [SHA corto]`.
+- Las secciones afectadas por el diff (ej. si se desplegaron nuevas skills, actualizar `## Inventario`).
+- **No reescribir** `## Stack Calibrado` ni `## Hooks Activos` si no cambiaron.
+
+**Regla 5 — Secciones custom:**
+
+Secciones en `ecosystem_state.md` no gestionadas por `calibrate-templates` (añadidas manualmente por el equipo del proyecto) se preservan sin modificar. Identificar secciones custom como cualquier `##` que no sea `Inventario`, `Hooks Activos`, `Stack Calibrado` o `Última Calibración`.
+
+**Regla 6 — Cota de tamaño:**
+
+`ecosystem_state.md` vive en `ai_docs/_meta/`, fuera del scope del hook `core-context-loader` (que sólo lee `core/`). El archivo es leído por `calibrate-templates` y `/sync-upstream-trigger` Paso 4.5 según necesite. Mantenerlo bajo 200 líneas como límite blando para legibilidad; emitir nota al usuario si la calibración lo hace exceder:
+
+```
+WARN: ecosystem_state.md está cerca del límite de 200 líneas ([N] líneas actuales).
+Considera reducir el detalle en las secciones de inventario para mantener el archivo
+manejable cuando se lea on-demand.
+```
+
+**Regla 7 — Migración desde proyectos antiguos (primera calibración FULL-PASS):**
+
+Si el calibration log tiene secciones de inventario de templates (generadas en versiones anteriores cuando no existía `ecosystem_state.md`), añadir marker en esas secciones para indicar que el estado fue movido:
+
+```markdown
+<!-- migrado — ver ai_docs/_meta/ecosystem_state.md para estado actual -->
+```
+
+No eliminar el contenido histórico del calibration log — es log de operación y debe preservarse.
+
+#### Formato canónico de ecosystem_state.md tras calibración FULL-PASS
+
+```markdown
+# Estado del Ecosistema de Templates
+<!-- Actualizado por calibrate-templates — [FECHA ISO] — FULL-PASS -->
+<!-- Vive en ai_docs/_meta/ (managed-by-tooling, NO project memory) -->
+
+## Inventario
+**Commands (.claude/commands/):** [N] archivos
+- [lista de archivos .md]
+
+**Skills (.claude/skills/):** [M] skills
+- [lista de carpetas de skills]
+
+**Agentes (.claude/agents/):** [K] archivos
+- [lista de archivos .md]
+
+## Hooks Activos
+<!-- Leído de .claude/hooks/config.json — los 9 hooks deployables -->
+- context_monitor: [true/false]
+- prompt_guard: [advisory/block/false]
+- read_injection_scanner: [true/false]
+- scaffolding_guard: [true/false]
+- task_doc_validator: [true/false]
+- session_state: [true/false]
+- sprint_sync: [advisory/block/false]
+- sprint_doc_validator: [true/false/advisory/block]
+- core_context_loader: [true/false]
+
+## Stack Calibrado
+- **Lenguaje:** [versión exacta]
+- **Framework:** [versión exacta]
+- **Base de Datos:** [tipo + versión]
+- **Gestor de Paquetes:** [nombre]
+- **Testing:** [framework + comando]
+- **Linting:** [herramienta]
+
+## Última Calibración
+- **Fecha:** [FECHA ISO]
+- **Modo:** FULL-PASS | INCREMENTAL
+- **Git HEAD:** [SHA corto]
+- **Plantillas modificadas:** [N]
+- **Plantillas eliminadas:** [N]
+```
+
 ---
 
 ## Fase 4: Validación
 
-### Alcance según modo (NUEVO — task 074)
-
+### Alcance según modo
 **Si modo INCREMENTAL:** validar solo:
 - Frontmatter de los archivos modificados en este sync
 - Cross-references que involucran archivos modificados (búsqueda inversa: ¿alguien que se conserva referencia a un archivo de la lista? ¿la referencia sigue siendo válida?)
@@ -794,7 +947,7 @@ echo "Samples commit: $(git -C ai_docs/refs/adk-samples rev-parse --short HEAD 2
 - [ ] Valores específicos del proyecto están pre-llenados (sin placeholders genéricos en secciones modificadas)
 - [ ] Reglas del proyecto de CLAUDE.md están inyectadas en plantillas relevantes
 - [ ] Áreas de riesgo reflejan historial real de git (no adivinadas) *(solo FULL-PASS — INCREMENTAL reutiliza)*
-- [ ] Calibración documentada en `ai_docs/tasks/000_calibracion_proyecto.md` con campo `Modo:`
+- [ ] Calibración documentada en `ai_docs/_meta/calibration_log.md` con campo `Modo:`
 - [ ] Sin información sensible incluida (sin contraseñas, API keys, secretos)
 
 ### Presentar al Usuario
@@ -811,9 +964,7 @@ Calibración de Plantillas Completa
 Cambios realizados:
 - Eliminados: [lista de archivos eliminados]
 - Modificados: [lista de archivos modificados con resumen de 1 línea de qué cambió]
-- Documento de calibración: `ai_docs/tasks/000_calibracion_proyecto.md`
+- Documento de calibración: `ai_docs/_meta/calibration_log.md`
 
-**Revisa los cambios y avísame si algo necesita ajustes.**
-
-**Siguiente paso recomendado:** Ejecutar `/onboarding` para validación automatizada post-calibración.
+**Siguiente paso:** La calibración ha concluido. El siguiente paso es la validación post-calibración con la skill `onboarding` (invocada automáticamente por el script si corre desde el pipeline).
 ```

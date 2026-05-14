@@ -4,7 +4,7 @@
 >
 > **Prerrequisito:** subagent `adk` debe estar cargado como referencia de patrones ADK.
 >
-> **Cabecera de Metadatos opcional (T079):** los task docs ADK pueden incluir cabecera blockquote con `> **Depende de:**`, `> **Asunciones:**` y sub-sección "Wiring esperado" para el flujo `task-planner` Paso 0.6 (waves). Ver documentación completa en [`task_template.md`](task_template.md) §"Cabecera de Metadatos del Task Doc (opcional)" — esta plantilla hereda esa especificación. Para ADK, las "Asunciones" típicas incluyen: SDK ADK ≥1.27.1, modelo Gemini disponible, evalsets configurados.
+> **Cabecera de Metadatos opcional:** los task docs ADK pueden incluir cabecera blockquote con `> **Depende de:**`, `> **Asunciones:**` y sub-sección "Wiring esperado" para el flujo `task-planner` Paso 0.6 (waves). Para ADK, las "Asunciones" típicas incluyen: SDK ADK instalado (verificar versión vigente con `pip show google-adk`), modelo Gemini disponible, evalsets configurados.
 
 ---
 
@@ -107,7 +107,7 @@ Verificar que los repos oficiales están disponibles localmente.
 **Verificaciones:**
 - [ ] `ai_docs/refs/adk-python/` existe (SDK, docs, changelog, samples)
 - [ ] `ai_docs/refs/adk-samples/` existe (arquitecturas de referencia de Google)
-- Si NO existen: ejecutar `calibrate_templates` primero o clonar manualmente
+- Si NO existen: ejecutar `/calibrate-templates` primero o clonar manualmente
 
 ### Paso 0.0.1c: Análisis de Seguridad Pre-Tarea
 
@@ -154,27 +154,23 @@ Confirmar que el proyecto ADK usa nomenclatura `XXX_UPPER_SNAKE_CASE.md` para ar
 
 ### 0.0.6 — Triaje de Ingeniería (OBLIGATORIO para ESTÁNDAR+)
 
-<!-- AI Agent: Para tareas SIMPLE (<=2 archivos), el triaje es mental. Para ESTÁNDAR+, es conversación explícita con el usuario. RECORDAR: En ADK, la complejidad MÍNIMA es MEDIA — siempre hacer triaje explícito. -->
+**T1 — Radio de impacto (delta ADK):**
 
-**T1: Analizar** — Examinar el codebase para responder:
+- Unidad de análisis: **agentes, state keys, tools (FunctionTool / LLM tools / MCP), callbacks (before/after), session backends**.
+- Prerequisitos típicos: SDK ADK instalado (verificar versión vigente con `pip show google-adk`) · API key configurada · session backend correcto · state keys de upstream existen · `root_agent` exportado.
+- Integración: patrones de agentes/tools establecidos · state keys existentes reutilizables · MCP servers conectados.
+- Decisiones stack-specific en T2: ¿nuevo agente o extender existente? · ¿LLM o FunctionTool? (FunctionTool ahorra costes) · ¿callback o instrucción? · jerarquía de agentes innecesaria → KISS.
 
-- **Radio de impacto:** ¿Cuántos agentes, state keys, tools, callbacks se ven afectados?
-  - <=2 archivos en 1 agente → SIMPLE (raro en ADK)
-  - 3-6 archivos en 1-2 agentes → ESTÁNDAR
-  - 6+ archivos o 3+ agentes → COMPLEJA
-  - Agentes en producción, migración de state, cambio de session backend → CRÍTICA
-- **Prerequisitos:** ¿SDK version correcta? ¿Session backend configurado? ¿State keys de upstream existen? Trazar dependencias de estado (max 2 niveles). ✅ existe | ❌ falta.
-- **Integración:** ¿Hay patrones de agentes/tools establecidos? ¿State keys existentes que reutilizar?
-- **Stack-specific:** ¿Nuevo agente o extender existente? ¿LLM o FunctionTool? ¿Callback o instrucción? Verificar antes de planificar.
+**Tabla de complejidad (común a todos los stacks, con ajuste ADK):**
 
-**T2: Cuestionar (solo si hay razón):**
+| Radio | Complejidad |
+|---|---|
+| ≤2 archivos en 1 agente (raro en ADK) | SIMPLE |
+| 3-6 archivos en 1-2 agentes | ESTÁNDAR |
+| 6+ archivos o 3+ agentes | COMPLEJA |
+| Agentes en producción / migración de state / cambio de session backend | CRÍTICA |
 
-- Alcance cubre 2+ funcionalidades independientes → proponer desglose
-- FunctionTool puede resolver lo que se pide con LLM → proponerlo (ahorra costes)
-- Prerequisitos bloqueantes (state keys faltantes, session backend) → proponer resolverlos primero
-- Sobre-diseño detectado (jerarquía de agentes innecesaria) → proponer simplificación (KISS)
-
-**T3: Alinear** — Presentar al usuario (SIEMPRE en ADK, no solo ESTÁNDAR+):
+**Delta T3 ADK — siempre presentar al usuario** (no solo ESTÁNDAR+, por costes compuestos de errores ADK):
 
 ```
 Alcance: [1-2 frases]
@@ -184,142 +180,25 @@ Costes LLM estimados: [flash: N llamadas, pro: M llamadas]
 ¿Confirmas este alcance para crear el documento de tarea?
 ```
 
-**PUNTO DE ESPERA:** Esperar confirmación antes de proceder.
+**PUNTO DE ESPERA:** Esperar confirmación antes de proceder (incluso para SIMPLE — regla ADK).
 
 ---
 
-### Paso 0.1: Verificar Estructura del Proyecto
+### Pasos 0.1–0.7 — Gestión del documento de tarea
 
-**Información Requerida:**
-- Verificar que el directorio `ai_docs/` existe
-- Verificar que el subdirectorio `ai_docs/tasks/` existe
+**Delta ADK:**
 
-**DETENER si** `ai_docs/` o `ai_docs/tasks/` no existen -- preguntar si crear.
+- **Paso 0.4 — Convención de nombres:** `XXX_UPPER_SNAKE_CASE.md` (estilo SDK Google). Ejemplos: `043_IMPLEMENT_COORDINATOR_AGENT.md`, `044_REFACTOR_TOOL_INTEGRATION.md`, `045_ADD_CALLBACK_HANDLERS.md`.
+- **Paso 0.5 — Presentación ampliada al usuario:** incluir secciones específicas ADK tras el resumen — `Arquitectura: [SequentialAgent | LlmAgent | LoopAgent | ParallelAgent | etc.]` y `Decisiones Clave: [Opciones principales y justificación]`. Verificación rápida adicional: ¿la exploración de arquitectura (Paso 1-2-3 ADK) reveló alternativas no consideradas? Si sí → comunicar como observación.
+- **Paso 0.6 — Notas de revisión ADK:** formato `**[REVISIÓN - YYYY-MM-DD HH:MM]** Retroalimentación del usuario: [Qué cambió] / Enfoque actualizado: [Cómo cambió]`.
+- **Paso 0.7 — Registro de Implementación Fase X:** incluir `**Detalles ADK**: Tipo de agente, state keys, herramientas` en cada actualización.
 
-### Paso 0.2: Verificar Documento de Tarea Activa
-
-**Antes de crear una nueva tarea, verificar si ya existe una para este trabajo:**
-
-1. Listar archivos en `ai_docs/tasks/` y buscar un documento relacionado con la solicitud actual
-2. Si el usuario pide correcciones/revisiones -- buscar y ACTUALIZAR ese documento
-3. Si el usuario pide continuar implementación -- buscar y ACTUALIZAR ese documento
-4. Si el usuario pide una revisión -- buscar y ACTUALIZAR ese documento
-5. **Solo crear un nuevo número de tarea si es trabajo GENUINAMENTE NUEVO**
-
-**Si se encuentra tarea activa:** Saltar al Paso 0.5 (Manejar Actualizaciones) y trabajar sobre el documento existente.
-
-### Paso 0.3: Detectar Siguiente Número de Tarea
-
-**Solo si el Paso 0.2 confirmo que no aplica ninguna tarea existente:**
-
-1. Listar archivos en `ai_docs/tasks/`
-2. Extraer el prefijo de 3 dígitos de CADA nombre de archivo
-3. Encontrar el número mas alto entre TODOS los archivos
-4. Sumar 1 y formatear con 3 dígitos
-5. Si no hay archivos: usar 001
-
-**Reglas:**
-- Secuencia global compartida (no reiniciar por tipo)
-- Siempre 3 dígitos: 001, 042, 156
-- Cada número se usa EXACTAMENTE UNA VEZ -- un número, un archivo
-- ❌ El número `000` está RESERVADO para calibración del proyecto — nunca usar para tareas normales
-
-### Paso 0.4: Crear Documento de Tarea
-
-**CRÍTICO: UNA tarea = UN archivo. UN número = UN archivo. Sin excepciones.**
-
-**Nomenclatura**: `XXX_UPPER_SNAKE_CASE.md`
-**Verificar:** NO existe ningun archivo con ese prefijo numerico
-
-**Ejemplos**:
-```
-043_IMPLEMENT_COORDINATOR_AGENT.md
-044_REFACTOR_TOOL_INTEGRATION.md
-045_ADD_CALLBACK_HANDLERS.md
-```
-
-### Paso 0.5: Presentar al Usuario
-
-**NOTA:** El análisis crítico de impacto, prerequisitos y alcance ya se realizó en el Triaje de Ingeniería (Paso 0.0.6). Aquí se presenta el documento ya validado.
-
-**Verificación rápida antes de presentar:**
-- ¿El documento refleja el alcance validado en T3? Si no → actualizar.
-- ¿La exploración de arquitectura reveló algo nuevo? Si sí → comunicar como observación.
-
-Despues de completar el triaje Y la exploración de arquitectura:
-
-```
-Tarea Creada: ai_docs/tasks/XXX_UPPER_SNAKE_CASE.md
-
-Resumen: [2-3 oraciones]
-Arquitectura: [SequentialAgent | LlmAgent | etc.]
-Decisiones Clave: [Opciones principales y justificación]
-
-[Solo si se descubrió algo nuevo:]
-Observaciones y Sugerencias del Asistente:
-Tras analizar la tarea y el codebase, he identificado lo siguiente:
-
-1. **[Categoría]:** [Observación o sugerencia concreta]
-2. **[Categoría]:** [Observación o sugerencia concreta]
-3. **[Categoría]:** [Observación o sugerencia concreta — si aplica]
-
-> Categorías válidas: Dependencia detectada | Prerequisito | Alternativa de enfoque | Optimización | Riesgo identificado | Ajuste de alcance | Refactorización recomendada
-
-Opciones:
-A) Vista Previa de Cambios de Código Detallados
-B) Aprobar e Iniciar Implementación
-C) Modificar o Iterar sobre el Plan
-   Ajustar el enfoque, explorar las sugerencias, o refinar el plan antes de comprometerse.
-```
-
-**ESPERAR elección explicita del usuario** - NO asumir aprobación
-
-**NOTA SOBRE ITERACIÓN:** La iteración es el proceso normal. Las tareas raramente están perfectas en la primera versión. Si el usuario elige C, actualizar el documento existente, incorporar el feedback, y re-presentar con nuevas sugerencias basadas en la conversación.
-
-### Paso 0.6: Manejar Actualizaciones
-
-**Si el usuario solicita cambios**:
-- Editar archivo original (usar herramienta Edit)
-- NO crear nuevas versiones (_v2, _updated, etc.)
-- Agregar notas de revisión con timestamps
-
-```markdown
-**[REVISIÓN - 2025-01-23 15:30]**
-Retroalimentación del usuario: [Que cambio]
-Enfoque actualizado: [Como cambio]
-```
-
-### Paso 0.7: Rastrear Progreso de Implementación
-
-**Durante implementación, actualizar documento de tarea**:
-```markdown
-## Registro de Implementación Fase X
-**Estado**: Completado | En Progreso | Bloqueado
-**Completado**: 2025-01-23 16:45
-**Archivos Modificados**: [lista con conteos de líneas]
-**Detalles ADK**: Tipo de agente, state keys, herramientas
-**Desviaciones**: [Cambios del plan]
-**Problemas**: [Problemas específicos de ADK]
-```
-
-#### Regla de Alcance Estricto (ACTIVA durante toda la implementación)
-
-> OBLIGATORIO: Solo modificar código directamente relacionado con la sección "Incluye".
-
-- Si se descubre un problema FUERA del alcance:
-  1. **NO arreglarlo** — documentarlo como nota en "Descubrimientos fuera de alcance" del task document
-  2. Si es BLOQUEANTE para la tarea actual: PAUSAR, informar al usuario, esperar decisión
-  3. Si NO es bloqueante: ignorarlo completamente
-- **Test rápido:** ¿Este cambio está en "Incluye"? → SI: proceder. NO: no tocarlo.
-- **Excepción única:** errores de sintaxis/compilación en líneas que YA se están modificando
-- **Prohibido:** arreglar warnings, code smells, o deuda técnica encontrada "de paso"
-
-### Paso 0.8: Revisión Post-Implementación
+**Paso 0.8 — Revisión Post-Implementación (ADK-específico, extiende el genérico):**
 
 ```markdown
 ## Implementación Completa
-**Fecha**: 2025-01-23 20:30
-**Duración**: 8.5 horas
+**Fecha**: YYYY-MM-DD HH:MM
+**Duración**: X horas
 **Estado**: Todos los Criterios de Éxito Cumplidos
 
 ### Resultados de Validación
@@ -331,30 +210,18 @@ Enfoque actualizado: [Como cambio]
 
 ---
 
-## ACCIONES PROHIBIDAS
+## Acciones Prohibidas y Documento Único
 
-### NO HACER:
-- Crear documentos de tarea sin aprobación del usuario
-- Implementar antes de crear documento de tarea
-- Omitir exploración de arquitectura
-- Empezar a codificar sin validación Fase 1-2-3
-- Crear nuevas versiones (_v2, _updated)
-- Crear multiples archivos con el mismo número de tarea
-- Crear archivos de resumen/reporte separados del documento de tarea
-- Asumir aprobación del usuario
+**Delta ADK (añadir a las prohibiciones genéricas):**
 
-### REGLA DE DOCUMENTO ÚNICO (ABSOLUTA):
-- UN número de tarea = UN archivo. Punto.
-- Correcciones -- actualizar el documento de tarea existente
-- Progreso de implementación -- marcar checkboxes en el documento existente
-- Revisiones -- agregar notas de revisión al documento existente
-- Sub-reportes, archivos de verificación -- agregar como secciones EN el documento existente
+- Omitir exploración de arquitectura antes de implementar.
+- Empezar a codificar sin validación Fase 1-2-3 (análisis de codebase, alternativas, decisión).
+- Crear archivos de resumen/reporte separados del documento de tarea (todo va EN el task doc).
 
-### PARADA DE EMERGENCIA si:
-- Usuario no ha aprobado arquitectura
-- Validación de dependencias de estado falla
-- Directorios requeridos no existen
-- A punto de crear un segundo archivo con un número existente -- editar el archivo existente
+**Parada de emergencia ADK:**
+- Usuario no ha aprobado arquitectura → DETENER.
+- Validación de dependencias de state keys falla → DETENER.
+- Directorios requeridos no existen → DETENER.
 
 ---
 
@@ -407,78 +274,12 @@ Enfoque actualizado: [Como cambio]
 
 ## Instrucciones para el Agente de IA
 
-**Rol: Ingeniero de Software Senior especializado en ADK, no documentador.**
+Ver sección canónica en `task_template.md` §"Instrucciones canónicas para el Agente de IA". Deltas específicos de ADK:
 
-El asistente NO acepta la petición del usuario sin análisis. ANTES de crear cualquier documento de tarea, ejecutar el Triaje de Ingeniería (Paso 0.0.6): analizar impacto en agentes y estado, trazar prerequisitos, evaluar alcance.
-
-### Disciplina de Alcance (OBLIGATORIO)
-
-> Complementa la "Regla de Alcance Estricto" del Paso 0.6 con principios de decisión.
-
-- **Decisiones intencionales:** Asumir que código existente fuera del alcance refleja decisiones de negocio válidas. No sugerir cambios a código funcional que no está en el scope.
-- **Auto-remediación prohibida:** Nunca corregir problemas descubiertos durante review sin confirmación explícita del usuario. Reportar → esperar → actuar.
-
-### Señales de Alerta (DETENER y comunicar al usuario)
-
-- Petición que cubre 2+ funcionalidades independientes → proponer desglose en tareas separadas
-- Prerequisitos bloqueantes (state keys faltantes, SDK incompatible) → proponer resolverlos primero
-- FunctionTool puede reemplazar llamada LLM → proponerlo (ahorra costes)
-- Radio de impacto sugiere complejidad diferente a la intuida → advertir y re-clasificar
-- Jerarquía de agentes innecesaria → proponer simplificación (KISS)
-
-### Flujo de Trabajo
-
-1. **Triaje** — Analizar impacto, prerequisitos, alcance (Paso 0.0.6 — T1/T2/T3)
-2. **Alinear** — Presentar alcance al usuario, esperar confirmación
-3. **Pre-flight** — Verificar entorno ADK (Python, SDK, estructura de agentes)
-4. **Documentar** — Crear documento de tarea con alcance validado
-5. **Presentar** — Opciones A/B/C
-6. **Implementar** — Solo tras aprobación explícita (opción B)
-
-### Opciones de Implementación (presentar siempre)
-
-**A)** Vista Previa de Cambios de Código — fragmentos antes/después
-**B)** Proceder con Implementación — fase por fase
-**C)** Modificar o Iterar sobre el Plan — ajustar antes de comprometerse
-
-Esperar elección explícita. NUNCA asumir aprobación.
-
-### Durante Implementación
-
-Por cada fase completada:
-- Actualizar checkbox: `[x]` + timestamp + archivos modificados + resultado de verificación (lint/tipos/state validation)
-- Si se descubre que el alcance era incorrecto → DETENER, comunicar, re-planificar
-- Esperar "proceder" antes de siguiente fase
-
-Tras todas las fases: cambiar estado a `Pending Review` → ejecutar checklist de revisión → si APROBADO cambiar a `Completado`.
-
-### Checklist de Revisión (SE Principles)
-
-1. **Requisitos**: Todos los criterios de éxito verificables cumplidos
-2. **Linting**: `ruff check .` + `mypy .` sin errores
-3. **Code smells**: En módulos modificados, verificar anti-patrones ADK (ver §17). En el scope del cambio, verificar que no se crean agents sin uso ni state keys huérfanas. NO auditar todo el proyecto.
-4. **DRY**: En archivos modificados, verificar que no se duplica lógica entre agents — instrucciones compartidas → reportar propuesta `global_instruction`, tools duplicadas → reportar propuesta de refactorización. NO refactorizar automáticamente.
-5. **KISS**: ¿Mínimos agents necesarios? ¿Se puede resolver con 1 agent en vez de 3? Sin sobre-ingeniería de jerarquías
-6. **SoC**: Cada agent tiene responsabilidad única. Root coordina, sub-agents procesan. Tools deterministas separadas de LLM
-7. **Seguridad**: Sin secretos hardcodeados, API keys en variables de entorno, tools con mínimo privilegio
-8. **Integración**: Tabla de dependencias de state keys para el agente/módulo modificado (§6). Verificar que no se crean keys huérfanas en el scope del cambio. Verificar imports MCP correctos.
-9. **Regresión**: Probar flujo end-to-end del agente/módulo modificado. Verificar que agents directamente conectados no cambiaron comportamiento.
-10. **Arquitectura**: Checklist de 30 puntos (§3) con puntuación ≥27
-11. **Baseline de deuda técnica** (ESTÁNDAR+): Documentar agents/tools/state keys sin uso existentes. Verificar que la tarea no añade deuda nueva
-
-### Aprobación Explícita
-
-**APROBADO**: "ejecuta", "adelante", "aprobado", "proceder", "se ve bien"
-**NO APROBADO**: "interesante", "ya veo", preguntas sobre el plan, silencio
-**AMBIGUO**: "ok", "vale", "claro" → confirmar antes de proceder
-
----
-
-## CRÍTICO: Referencia de Documentación ADK
-
-**Docs Oficiales**: https://google.github.io/adk-docs/
-
-**Leer ANTES de diseñar**: Siempre verificar docs oficiales para patrones y mejores prácticas actuales.
+- **Triaje de tipo de agente:** decidir `SequentialAgent` vs `ParallelAgent` vs `LoopAgent` antes de planificar — impacta state flow y error propagation.
+- **State keys:** tabla de dependencias de state keys para el módulo modificado (§6); verificar que no se crean keys huérfanas ni agents sin uso en el scope del cambio.
+- **FunctionTool vs LLM call:** si una operación es determinista, proponer `FunctionTool` (ahorra costes y latencia) antes de asumir llamada LLM.
+- **Docs oficiales ADK:** verificar docs oficiales del SDK Google ADK para patrones actuales antes de diseñar. Verificar versión vigente con `pip show google-adk`.
 
 ---
 
@@ -1132,20 +933,10 @@ before_agent_callback → Agente (escribe output_key) → after_agent_callback
 
 ## PUERTA PRE-IMPLEMENTACIÓN (OBLIGATORIO)
 
-Antes de iniciar cualquier implementación, TODOS los checkboxes deben estar marcados:
-
-- [ ] Triaje de Ingeniería completado — alcance validado con usuario
-- [ ] Prerequisitos verificados — todos existen o tienen tarea separada
-- [ ] Complejidad clasificada (SIMPLE / ESTÁNDAR / COMPLEJA / CRÍTICA)
-- [ ] Pre-flight completado sin errores
-- [ ] Archivos afectados identificados
-- [ ] Alternativas evaluadas (ESTÁNDAR+)
-- [ ] Casos extremos analizados (ESTÁNDAR+)
-- [ ] Rollback documentado (COMPLEJA/CRÍTICA)
-- [ ] Criterios de éxito medibles definidos
-- [ ] Documento presentado y aprobado por usuario
-
-→ Si CUALQUIER checkbox sin marcar: DETENER. No implementar.
+**Delta ADK (añadir checkboxes):**
+- `[ ] Validación 30 puntos ADK completada (puntuación ≥27)` — checklist arquitectónico de §3.
+- `[ ] Dependencias de state keys trazadas (sin keys huérfanas)` — verificación específica ADK §6.
+- `[ ] Costes LLM estimados (flash: N llamadas, pro: M llamadas)` — restricción de presupuesto.
 
 ---
 
@@ -1182,6 +973,26 @@ LISTO PARA IMPLEMENTAR | NECESITA REVISIÓN | BLOQUEADO
 - [ ] Documentación completa
 - [ ] Desplegado exitosamente
 
+### Criterios de Calidad de Ingeniería (canónicos)
+
+> **Obligatorio si la task toca código ejecutable** (.py/archivos bajo `agents/`, `tools/`, `callbacks/`, `config/`, `evals/`). Para tasks puramente documentales/config sin runtime, declarar excepción literal `Excepción a Criterios de Calidad de Ingeniería: task no toca código ejecutable (solo <docs/config>).` dentro del cuerpo de la sección "Riesgos aceptados", "Decisiones aceptadas" o "Riesgos y mitigaciones".
+
+- [ ] **Cleanup exhaustivo de comentarios:** archivos modificados sin comentarios narrativos del "qué hace el código", sin TODO/FIXME residual sin issue trackeado, sin código comentado. Verificable: `grep -nE "(TODO|FIXME|XXX)" <archivos>` retorna ≤ baseline previo + `ruff check` sin reportar `FIX001`/`TD002`. Comentarios permitidos solo cuando explican el WHY no obvio (decisión arquitectónica ADK, constraint del SDK, workaround citado).
+
+- [ ] **Sin dead/legacy code:** sin tools/callbacks/agents declarados y nunca registrados en el orquestador, sin variables `state_keys` huérfanas, sin imports muertos, sin código inalcanzable. Verificable: `vulture agents/ tools/`, `pyflakes` o `ruff check --select F401,F841` sin nuevos hallazgos; `grep -r "<symbol>"` confirma registro en `root_agent` o `tools=[...]` (excepto APIs públicas declaradas).
+
+- [ ] **DRY/KISS/early returns aplicados:** sin bloques de 3+ líneas duplicados entre tools/callbacks/agents (extraer a `tools/_shared.py` o citar duplicación existente), sin abstracciones para 1 callsite, sin nesting innecesario donde un early return guard simplifica (validación de `tool_input` temprana). Verificable: revisión humana o `reviewer` agent §9, con verdict explícito por archivo modificado.
+
+- [ ] **TDD reutilizando infra existente:** todo agent/tool/callback nuevo/modificado tiene test(s) escritos junto al código (no después), reutilizando `pytest` fixtures existentes en `tests/conftest.py`, evaluators en `evals/` y `AgentEvaluator` del SDK ADK. Verificable: archivo de test correspondiente existe + kill-the-mutant pasa (comentar línea clave del tool → al menos 1 test/eval relevante falla). Activar la skill `adk-evaluation-testing` para evaluators de regresión sobre comportamiento del agent.
+
+**Defense-in-depth automático:** este bloque es validado por hook `task-doc-validator.js` + plan-checker D10 + reviewer §9 + task-implementation-review §10. El `task-planner` Paso 7.4 (o `adk` agent) lo inyecta automáticamente.
+
+---
+
+## Bloque `contract:` (opcional)
+
+> Ver `task_template.md` §"20. Bloque `contract:` opcional" para schema completo. Aplicable a tareas ESTÁNDAR+ con `depends_on:` declarado o handoffs explícitos. Sin delta ADK (los `state_keys` de upstream se documentan como prerequisitos en T1, no en `contract:`).
+
 ---
 
 ## Agent Recomendado
@@ -1195,5 +1006,5 @@ Después de crear el documento de tarea, usar el siguiente agent para implementa
 ---
 
 **Versión de Plantilla**: 3.0
-**Compatibilidad ADK**: v1.22+ (verificado contra SDK v1.27.1, 2026-03-15)
+**Compatibilidad ADK**: para docs oficiales del SDK Google ADK, ejecutar `pip show google-adk`.
 **Última Actualización**: 2026-03-15

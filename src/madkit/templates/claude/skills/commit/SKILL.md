@@ -30,6 +30,29 @@ ai_docs/          # Documentos de tareas, referencias, workflow AI
 
 ---
 
+## Pre-commit: estructura por unidad de trabajo
+
+Antes de stagear, comprobar que el commit es UNA unidad entregable, no un batch por tipo de archivo.
+
+**Reglas:**
+- 1 commit = 1 comportamiento, fix, migración o unidad de docs entregable.
+- Tests viajan con el comportamiento que verifican. Docs viajan con la feature que explican.
+- NO commitear "primero models, luego services, luego tests" si ninguno aporta valor solo.
+- El repo debe tener sentido tras aplicar SOLO este commit (rollback razonable sin tocar work ajeno).
+- El mensaje explica el outcome, no la lista de archivos.
+
+**Split débil vs split por work-unit:**
+
+| Débil | Por work-unit |
+|---|---|
+| `add models` | `feat(auth): add token validation domain model and tests` |
+| `add services` | `feat(auth): wire token validation into login flow` |
+| `add tests` | (incluido con el commit del comportamiento) |
+
+**Stacking:** si el cambio supera 400 líneas, partir en commits work-unit e invocar "Estrategia de stacking" de la skill `pr` antes del push.
+
+---
+
 ## Paso 2: Staging Selectivo
 
 **NUNCA `git add .` ni `git add -A`** — siempre `git add <archivos-específicos>`
@@ -45,32 +68,23 @@ ai_docs/          # Documentos de tareas, referencias, workflow AI
 
 ## Paso 3: Mensaje de Commit
 
-```
-<type>: <línea de asunto bajo 50 caracteres>
+Formato: `<type>: <asunto en imperativo, ≤72 chars, sin punto final>` + cuerpo opcional (qué cambió y por qué, wrap 72 chars).
 
-<cuerpo: qué cambió y por qué, wrap a 72 caracteres>
-
-Co-Authored-By: Claude <model> <noreply@anthropic.com>
-```
-
-- Modo imperativo, minúsculas tras prefijo, sin punto final en asunto
-- El cuerpo explica QUÉ y POR QUÉ, no CÓMO
+- Tipos válidos (CLAUDE.md §3.4): `create`, `optimize`, `update`, `fix`, `refactor`
+- Asunto: imperativo, minúsculas tras prefijo, sin punto final. Cuerpo: QUÉ y POR QUÉ, no CÓMO
 - Si se proporcionó `$ARGUMENTS`: usarlo como base
+- **PROHIBIDO `Co-Authored-By:`** — el commit lo firma exclusivamente el git user configurado. Verificación: `grep -i "co-authored" <msg>` debe retornar vacío. El hook `scaffolding-guard` bloquea si detecta `Co-Authored-By:` con `Claude` o `anthropic`.
 
 ---
 
 ## Paso 4: Estrategia de Commit
 
-**Comprensivo (por defecto):** Un commit para trabajo relacionado
-**Atómico (PR-ready):** Una unidad lógica por commit — cuando hay features independientes, áreas no relacionadas, o se prepara para code review
+| Estrategia | Cuándo |
+|---|---|
+| **Comprensivo** (por defecto) | Trabajo relacionado en una sola unidad |
+| **Atómico** (PR-ready) | Features independientes, áreas no relacionadas, revisión por commit |
 
-Presentar al usuario antes de ejecutar:
-```
-Estrategia: [Comprensivo / Atómico]
-Archivos: [cantidad] archivos staged
-Mensaje: [mensaje propuesto]
-¿Proceder? (S/n)
-```
+Presentar al usuario (estrategia · archivos staged · mensaje propuesto) y pedir confirmación antes de ejecutar.
 
 ---
 

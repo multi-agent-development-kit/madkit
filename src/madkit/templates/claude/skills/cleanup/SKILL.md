@@ -1,6 +1,6 @@
 ---
 name: cleanup
-description: "Guía TypeScript/Next.js. Activar proactivamente al editar/crear .ts/.tsx o al refactorizar/limpiar/optimizar código TypeScript/React. NO con .py (cleanup-python) ni manage.py (cleanup-django). Scope: archivos de la tarea activa."
+description: "Guía TypeScript/Next.js (.ts/.tsx/.js): refactor seguro, type safety, patrones Next.js. Activar al editar/crear .ts/.tsx o al refactorizar/limpiar código TypeScript/React. NO con .py (cleanup-python) ni manage.py (cleanup-django)."
 context: fork
 agent: implementer
 effort: high
@@ -71,30 +71,7 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
 
 ### Sin Async Client Components
 
-Solo **Server Components** pueden ser async. Patrón: Server Component obtiene datos → pasa como props a Client Component.
-
-```typescript
-// page.tsx (Server Component — async OK)
-export default async function Page() {
-    const data = await getData();
-    return <MyClientComponent data={data} />;
-}
-
-// MyClientComponent.tsx (Client Component — NO async)
-"use client";
-export function MyClientComponent({ data }: { data: DataType[] }) {
-    const [state, setState] = useState(false);
-    return <div>...</div>;
-}
-```
-
-### useSearchParams requiere Suspense
-
-```typescript
-<Suspense fallback={<p>Loading...</p>}>
-    <SearchComponent />
-</Suspense>
-```
+Solo **Server Components** pueden ser async. Patrón: Server Component obtiene datos → pasa como props a Client Component. `useSearchParams` en Client Components requiere envolverse en `<Suspense>`.
 
 ### Directiva "use client"
 
@@ -102,22 +79,7 @@ Server Components por defecto. Solo agrega `"use client"` cuando necesites React
 
 ### Directiva "use cache" (Next.js 16)
 
-```typescript
-// Cache a nivel de función — reemplaza unstable_cache
-"use cache";
-export async function getProducts() {
-    return db.products.findMany();
-}
-
-// Cache con revalidación
-import { cacheLife } from 'next/cache';
-
-export async function getStats() {
-    "use cache";
-    cacheLife("hours");
-    return computeExpensiveStats();
-}
-```
+Directiva de función que reemplaza `unstable_cache`. Añadir `"use cache";` al inicio de la función async. Para revalidación: importar `cacheLife` desde `next/cache` y llamar `cacheLife("hours" | "days" | "weeks")` dentro de la función.
 
 ### Turbopack (default en Next.js 16)
 
@@ -128,17 +90,8 @@ Si hay problemas de compatibilidad: `next dev --webpack` como fallback.
 
 ```typescript
 "use server";
-export type Result = { success: true; data: T } | { success: false; error: string };
-
-export async function uploadFile(file: File): Promise<Result> {
-    try {
-        const result = await storage.upload(file);
-        return { success: true, data: result };
-    } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : "Failed" };
-    }
-}
-// client component maneja el toast
+export type Result<T> = { success: true; data: T } | { success: false; error: string };
+// Retornar Result<T> en lugar de lanzar excepciones; el Client Component maneja el toast
 ```
 
 ---
@@ -154,14 +107,6 @@ export async function uploadFile(file: File): Promise<Result> {
 ### Tipos de retorno explícitos
 
 Todas las funciones requieren tipo de retorno explícito. **Excepción:** componentes React (TypeScript infiere JSX correctamente).
-
-```typescript
-// ✅ Función — tipo de retorno explícito
-function getUserData(id: string): Promise<User | null> { ... }
-
-// ✅ Componente React — no necesita tipo de retorno
-function HeroSection({ title }: { title: string }) { ... }
-```
 
 ---
 
@@ -216,45 +161,9 @@ npm run lint && npm run type-check                   # lint + tipos
 
 ## Patrones de Error Handling
 
-### Clases de Error Custom
+**Clases de Error Custom:** jerarquía `AppError extends Error` con campos `code`, `statusCode`, `details`. Subclases: `ValidationError` (400), `NotFoundError` (404). Cada subclase llama `super(message, CODE, statusCode, details)` y usa `Error.captureStackTrace`.
 
-```typescript
-class AppError extends Error {
-  constructor(
-    message: string,
-    public code: string,
-    public statusCode: number = 500,
-    public details?: Record<string, unknown>,
-  ) {
-    super(message);
-    this.name = this.constructor.name;
-    Error.captureStackTrace(this, this.constructor);
-  }
-}
-
-class ValidationError extends AppError {
-  constructor(message: string, details?: Record<string, unknown>) {
-    super(message, "VALIDATION_ERROR", 400, details);
-  }
-}
-
-class NotFoundError extends AppError {
-  constructor(resource: string, id: string) {
-    super(`${resource} not found`, "NOT_FOUND", 404, { resource, id });
-  }
-}
-```
-
-### Agregación de Errores
-
-Recopilar múltiples errores en vez de fallar en el primero (útil para validación):
-
-```typescript
-const errors: Error[] = [];
-if (!data.email) errors.push(new ValidationError("Email requerido"));
-if (!data.name) errors.push(new ValidationError("Nombre requerido"));
-if (errors.length > 0) throw new AggregateError(errors, `${errors.length} errores`);
-```
+**Agregación de Errores:** acumular en `errors: Error[]` y lanzar `AggregateError` al final — nunca fallar en el primer error cuando se valida un formulario completo.
 
 > **Nota:** El Result type para Server Actions ya está cubierto arriba en la sección de discriminated unions.
 

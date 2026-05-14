@@ -1,6 +1,7 @@
 ---
 name: adk-bottleneck-analysis
-description: "Diagnóstico de problemas ADK. Activar proactivamente ante resultados incorrectos, lentitud, tools no llamadas o errores de state en agentes ADK. Si el problema es de prompts → adk-prompt-cleanup. Skill del agente adk."
+description: "[ADK] En proyectos Google ADK (google-adk SDK): diagnóstico de problemas de agentes. Activar ante resultados incorrectos, lentitud, tools no llamadas o errores de state en agentes ADK. Si el problema es de prompts → adk-prompt-cleanup."
+paths: ["**/agent.py", "**/agents/**", "**/adk/**/*.py", "**/pyproject.toml"]
 ---
 
 Eres un Especialista en Diagnóstico de Sistemas ADK. Analiza sistemáticamente el flujo de ejecución, identifica puntos de fallo y proporciona soluciones accionables con código cuando sea útil.
@@ -114,19 +115,7 @@ Categorizar problemas, desarrollar correcciones prioritizadas con archivos espec
 ### Patrón 3: LLM Haciendo Trabajo de Código
 - **Síntomas**: Ejecución lenta, valores alucinados, costos altos de API
 - **Diagnóstico**: ¿Agent haciendo parsing JSON, matemáticas, validación, matching de strings?
-- **Corrección**: Reemplazar con `FunctionTool`
-
-```python
-# MAL: LLM parsing JSON
-agent = LlmAgent(instruction="Parse {api_response} and extract user name and email")
-
-# BIEN: FunctionTool
-def extract_user_info(api_response: str) -> dict:
-    data = json.loads(api_response)
-    return {"name": data["user"]["name"], "email": data["user"]["email"]}
-
-agent = LlmAgent(tools=[extract_user_info], instruction="Use extract_user_info to get user data")
-```
+- **Corrección**: Reemplazar con `FunctionTool` — extraer la lógica determinista a una función Python con docstring y retorno `dict`
 
 ### Patrón 4: Compatibilidad output_schema + tools
 - **v1.22+**: Ambos funcionan juntos — output_schema NO bloquea tools
@@ -152,19 +141,16 @@ agent = LlmAgent(tools=[extract_user_info], instruction="Use extract_user_info t
 ### Patrón 9: Sin Observabilidad en Producción
 - **Síntomas**: No se puede diagnosticar en producción, logs insuficientes
 - **Diagnóstico**: ¿Hay plugins de logging/tracing configurados?
-- **Corrección**: Añadir DebugLoggingPlugin (dev) o OpenTelemetry (prod)
+- **Corrección**: Añadir `DebugLoggingPlugin` (dev) o OpenTelemetry/Arize AX (prod)
 
-```python
-# Dev: trazas completas a YAML
-from google.adk.plugins import DebugLoggingPlugin
-app = App(root_agent=agent, plugins=[DebugLoggingPlugin(output_path="debug.yaml")])
-```
+> Ver `adk-production-setup` §4 para stacks de plugins recomendados por entorno y configuración de `DebugLoggingPlugin`.
 
 ### Patrón 10: Sin Tests de Agentes (Regresiones Silenciosas)
 - **Síntomas**: "Antes funcionaba y ahora no" — sin forma de verificar
-- **Corrección**: Crear evalsets con `adk eval` (mínimo 3 POR AGENTE), optimizar con `adk optimize` (v1.27+)
-- **Referencia**: `ai_docs/refs/adk-python/tests/integration/fixture/` y `ai_docs/refs/adk-samples/` para ejemplos de evalsets
-- **Gate**: Sin evalsets = sin deploy. Métricas `safety_v1` ≥ 0.9 y `hallucinations_v1` ≥ 0.8 obligatorias
+- **Corrección**: Crear evalsets con `adk eval` + optimizar con `adk optimize` (v1.27+)
+- **Gate**: Sin evalsets = sin deploy
+
+> Ver `adk-evaluation-testing` para estructura de evalsets, métricas obligatorias (`safety_v1` ≥ 0.9, `hallucinations_v1` ≥ 0.8) y protocolo de regresión completo.
 
 ### Patrón 11: Contexto Excedido (Token Overflow)
 - **Síntomas**: Errores de contexto, respuestas truncadas, costos altos en sesiones largas
@@ -192,10 +178,10 @@ app = App(root_agent=agent, plugins=[DebugLoggingPlugin(output_path="debug.yaml"
 
 ## Plantillas Relacionadas
 
-- `task_template_adk.md` — Para implementar correcciones (command)
+- `references/task_template_adk.md` — Para implementar correcciones (reference cargada por task-planner)
 - `adk-workflow-design` — Para diseñar nuevos workflows (skill)
 - `adk-production-setup` — Para configurar servicios y deployment (skill)
 - `adk-evaluation-testing` — Para testing con evalsets y regression (skill)
 
 > Checklist de validación maestro en subagent `adk` § Protocolo de Validación Técnica + § Protocolo de Seguridad ADK
-> Ejemplos de arquitecturas en `ai_docs/refs/adk-samples/`
+> Ejemplos de arquitecturas: `ai_docs/refs/adk-samples/` si disponible en el proyecto, o documentación oficial ADK

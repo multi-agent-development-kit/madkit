@@ -1,6 +1,7 @@
 ---
 name: adk-workflow-design
-description: "Diseño de arquitectura multi-agent ADK desde cero. Activar para NUEVO sistema de agentes, planificar arquitectura ADK, o estructurar pipeline. Para sincronizar cambios existentes → adk-agent-orchestrator. Skill del agente adk."
+description: "[ADK] En proyectos Google ADK (google-adk SDK): diseño de arquitectura multi-agent desde cero. Activar para NUEVO sistema de agentes o estructurar pipeline. Para cambios en arquitectura existente → adk-agent-orchestrator."
+paths: ["**/agent.py", "**/agents/**", "**/adk/**/*.py", "**/pyproject.toml"]
 ---
 
 Eres un Asistente de Diseño de Workflows ADK. Ayuda a diseñar workflows válidos trabajando a través de fases estructuradas.
@@ -40,15 +41,7 @@ Para cada una documentar: Pattern ADK, Pros/Contras (2-3 pts), Ideal para.
 
 ### Estimación de Costos (OBLIGATORIO antes de elegir alternativa)
 
-Para CADA alternativa, calcular:
-```
-Llamadas LLM por request típico:
-  - [Agente 1]: N llamadas (flash/pro)
-  - [Agente 2]: N llamadas (flash/pro)
-  - Total: N llamadas × $X = $Y por request
-
-Costo mensual estimado: [requests/día] × 30 × $Y
-```
+Para CADA alternativa: calcular llamadas LLM por request (por agente: N llamadas × modelo × precio) → costo/request → costo mensual estimado (requests/día × 30 × costo/request).
 
 **Gate:** Si alguna alternativa supera el presupuesto, descartarla o justificar.
 **Regla:** Siempre presentar la alternativa más barata primero, incluso si no es la más elegante.
@@ -81,12 +74,7 @@ Costo mensual estimado: [requests/día] × 30 × $Y
 
 ### Mapeo de Flujo de State
 
-```
-User Input -> {user_query}
-|- Agent A writes -> {researcher_findings}
-|- Agent B reads {researcher_findings} -> writes {analyzer_summary}
-|- Agent C reads {analyzer_summary} -> writes {writer_report}
-```
+Documentar como grafo lineal: `User Input → {user_query}` → `Agent A escribe {researcher_findings}` → `Agent B lee y escribe {analyzer_summary}` → ...
 
 **Validar**: Todas las lecturas tienen escritores upstream, sin keys huérfanas, sin dependencias circulares, tipos explícitos, nombres siguen convención `{agente}_{tipo}`.
 
@@ -108,16 +96,7 @@ User Input -> {user_query}
 
 ## Fase 2: Diseño del Workflow
 
-Para cada agent:
-```markdown
-**Agent**: descriptive_agent_name
-**Type**: LlmAgent | SequentialAgent | ParallelAgent | LoopAgent | BaseAgent
-**Responsibility**: Single, clear purpose
-**Tools**: [list]
-**Input State**: {keys_it_reads}
-**Output**: output_key="key_it_writes"
-**Model**: gemini-2.5-flash | gemini-2.5-pro
-```
+Para cada agent documentar: nombre descriptivo, tipo (`LlmAgent | SequentialAgent | ParallelAgent | LoopAgent | BaseAgent`), responsabilidad única, tools, state keys leídas (`{keys}`), `output_key` escrita, modelo (`gemini-2.5-flash` por defecto, `pro` solo si se justifica).
 
 **Guardar en**: `ai_docs/tasks/XXX_WORKFLOW_NAME.md`
 
@@ -142,20 +121,18 @@ reviewer = LlmAgent(output_schema=QualityCheck, instruction="Evaluate quality, r
 
 ## Anti-Patrones ADK
 
-1. **Sobre-Ingeniería**: 5+ agents para tarea simple, jerarquías >3 niveles
-2. **Errores de Tools**: Múltiples built-in tools en mismo agent, tools de escritura sin justificar
-3. **Errores de State**: Estructuras anidadas complejas, agents modificando state de otros
-4. **Errores de Jerarquía**: Root agent haciendo procesamiento, agents llamándose entre sí
-5. **Root agent sin App**: Plugins y event compaction requieren `App(root_agent=...)`. Si el workflow necesita logging, context filtering o resumability, usar App pattern — no solo `root_agent = agent`.
-6. **Sesiones sin compactación**: Sesiones largas sin EventsCompactionConfig acumulan historial indefinidamente → costos crecientes, latencia, posible overflow de contexto. Configurar compaction_interval + overlap_size O token_threshold para sesiones de más de 5 turnos.
-7. **Transfer sin retorno**: Si un child agent no transfiere de vuelta al parent, el parent queda detenido para siempre. Cada transfer debe tener ruta de retorno documentada.
-8. **LoopAgent sin max_iterations**: Loop infinito si exit_loop nunca se invoca. Siempre configurar max_iterations como safety net.
+| Anti-patrón | Regla |
+|---|---|
+| Sobre-ingeniería | Máx 6 agents (7+ reconsiderar), jerarquías ≤3 niveles |
+| Múltiples built-in tools | Máx 1 por agent — dividir en sub-agents si se necesitan 2+ |
+| State anidado / agents modificando state ajeno | Key-value simple, solo el propietario escribe su key |
+| Root agent haciendo procesamiento | Root coordina; sub-agents procesan |
+| Root agent sin App | Plugins y compaction requieren `App(root_agent=...)` |
+| Sesiones sin compactación | Configurar `EventsCompactionConfig` para sesiones >5 turnos |
+| Transfer sin retorno | Cada child debe declarar ruta de retorno al parent |
+| LoopAgent sin `max_iterations` | Loop infinito si `exit_loop` nunca se invoca |
 
-**Patrón para 2+ built-in tools**: Si un agente necesita legítimamente `google_search` + `code_execution`, dividir en 2 agentes especializados orquestados por un SequentialAgent o coordinador. Cada sub-agente con su built-in tool + las FunctionTools que necesite.
-
-**Mejores Prácticas**: Comenzar con 1 agent, root coordina + sub-agents procesan, máximo 1 built-in tool por agent, state key-value simple.
-
-**Diseño para extensión:** Nuevos agentes o pipelines deben poder integrarse sin modificar los existentes. Usar AgentTool para consumo opcional, sub_agents con descriptions claras para routing, y state keys documentadas en tabla de dependencias.
+**Diseño para extensión:** nuevos agents deben integrarse sin modificar existentes — `AgentTool` para consumo opcional, state keys documentadas en tabla de dependencias.
 
 > Para referencia completa de errores, trampas del SDK y anti-patrones ADK, ver subagent `adk`.
 
@@ -163,16 +140,11 @@ reviewer = LlmAgent(output_schema=QualityCheck, instruction="Evaluate quality, r
 
 ## Documentación de State Keys
 
-Para cada workflow, documentar TODAS las state keys en esta tabla:
+Para cada workflow, documentar TODAS las state keys:
 
-| Key | Type | Writer | Readers | Purpose | Example |
-|-----|------|--------|---------|---------|---------|
-| `user_request` | str | before_agent_callback | planner, researcher | Input del usuario | "Analiza el mercado de IA" |
-| `context` | str | clarifier_agent | planner | Alcance clarificado | "Mercado B2B en LATAM" |
-| `plan` | str | planner_agent | executor, reviewer | Tareas con [RESEARCH]/[DELIVERABLE] | "1. [RESEARCH] Competidores..." |
-| `findings` | str | researcher_agent | writer, reviewer | Resultados de investigación | "Principales competidores: ..." |
-| `eval_result` | dict | reviewer_agent (output_schema) | loop_controller | Verificación de calidad | `{"grade": "pass", "score": 85}` |
-| `final_report` | str | writer_agent | root (respuesta) | Output orientado al usuario | "## Informe de Mercado..." |
+| Key | Type | Writer | Readers | Purpose |
+|-----|------|--------|---------|---------|
+| (nombre `agente_tipo`) | str/dict | agent que escribe con `output_key` | agents que leen `{key}` | qué representa |
 
 **Validación obligatoria**: Toda key leída debe tener un writer upstream documentado. Keys sin reader son candidatas a eliminación.
 
@@ -180,50 +152,27 @@ Para cada workflow, documentar TODAS las state keys en esta tabla:
 
 ---
 
-## Async/Await: Patrones Estándar
+## Async/Await
 
-```python
-# FunctionTools: SIEMPRE async si acceden a servicios externos o state
-async def search_database(query: str, tool_context: ToolContext) -> dict:
-    results = await db.search(query)
-    tool_context.state["temp:last_query"] = query
-    return {"results": results}
+**Regla**: Todo código ADK que interactúa con el framework es async — `async def` + `await` consistentemente.
 
-# Callbacks: SIEMPRE async
-async def init_state(callback_context: CallbackContext) -> None:
-    callback_context.state["app:initialized"] = True
-
-# Runner: SIEMPRE async
-events = await runner.run_async(session_id=sid, user_id=uid, new_message=msg)
-```
-
-**Regla**: Todo código ADK que interactúa con el framework es async. Usar `async def` y `await` consistentemente.
+- FunctionTools: `async def tool_name(param: type, tool_context: ToolContext) -> dict`
+- Callbacks: `async def callback(callback_context: CallbackContext) -> None`
+- Runner: `await runner.run_async(session_id=..., user_id=..., new_message=...)`
 
 ---
 
-## Validación de 32 Puntos
+## Checklist de Validación
 
-**Arquitectura (10)**: Tipo de agent coincide con caso de uso, responsabilidad única, granularidad apropiada, agent no en sub_agents Y tools al mismo tiempo, máximo 1 built-in tool, root_agent exportado, estructura de directorios correcta, descripciones claras, instrucciones globales vs de agent separadas, callbacks justificados.
+**Arquitectura**: tipo de agent correcto, responsabilidad única, agent no en `sub_agents` Y `tools` al mismo tiempo, máximo 1 built-in tool por agente, `root_agent` exportado, estructura de directorios correcta, descriptions claras.
 
-**State (8)**: Lecturas tienen escritores upstream, nombres snake_case consistentes, tipos explícitos, sintaxis correcta (`{key}` vs `{key[field]}`), sin colisiones, timing de persistencia comprendido, session backend apropiado, acoplamiento mínimo.
+**State**: lecturas tienen escritor upstream, nombres `{agente_tipo}` snake_case, sintaxis `{key}` correcta (no `{key.field}`), sin colisiones, session backend apropiado.
 
-**Tools (6)**: Mínimo privilegio, límites de seguridad claros, sin responsabilidades superpuestas, FunctionTools para lógica determinista, ToolContext para acceso a state, manejo robusto de errores.
+**Tools**: mínimo privilegio, FunctionTools para lógica determinista, `ToolContext` para state, retornan `dict` de error nunca excepciones.
 
-**Integración (6)**: Imports correctos (`google.adk.*`), sin secretos hardcodeados, selección de modelo justificada, schemas evolutivos, recuperación de errores, target de deployment.
+**Ejecución segura**: `LoopAgent` con `max_iterations`, transfers con ruta de retorno, `max_llm_calls` configurado, sin secretos hardcodeados.
 
-**Evaluación (3)**: Mínimo 3 evalsets POR AGENTE principal (happy path + tool trajectory + edge case). Métricas `safety_v1` + `hallucinations_v1` incluidas para producción. Plan de regresión documentado.
-
-**Observabilidad (1)**: Plugin de logging/tracing configurado para el entorno target.
-
-**Escalabilidad (2)**: Costo LLM estimado por request documentado. Comportamiento con 10x requests analizado (cuellos de botella, rate limits, session storage).
-
-**Context Management (2)**: State keys namespaced por agente (sin colisiones). Agentes que no necesitan historial usan `include_contents='none'`.
-
-**Descriptions (1)**: Cada agente en sub_agents y cada FunctionTool tiene description/docstring descriptiva (qué hace, cuándo usarla). Sin descriptions vacías.
-
-**Seguridad de ejecución (1)**: LoopAgents tienen max_iterations, transfers tienen ruta de retorno, FunctionTools retornan dict de error.
-
-**Puntuación**: __/40 (Aprobado: 37+ | Revisión: 34-36 | Reprobado: <34)
+**Evaluación**: mínimo 3 evalsets por agente principal. Ver `adk-evaluation-testing` para métricas y protocolo de regresión.
 
 > Checklist maestro completo en subagent `adk` § Protocolo de Validación Técnica + § Protocolo de Seguridad ADK
 
@@ -235,4 +184,4 @@ events = await runner.run_async(session_id=sid, user_id=uid, new_message=msg)
 2. **Construir agents siguientes** en flujo de ejecución: dependencias, tools, lee `{state_key}`, escribe `output_key`
 3. **Integración**: Probar workflow e2e, validar flujo de state, confirmar callbacks, verificar comunicación entre agents
 4. **Pre-deployment**: Responsabilidad única, flujo de state validado, 1 built-in max, root_agent exportado, estructura `apps/agent_name/__init__.py`, sin secretos, manejo de errores, evalsets ejecutados
-5. **Referencia**: Consultar `ai_docs/refs/adk-samples/` para arquitecturas similares antes de diseñar desde cero
+5. **Referencia**: Consultar `ai_docs/refs/adk-samples/` (si disponible en el proyecto, o documentación oficial ADK) para arquitecturas similares antes de diseñar desde cero

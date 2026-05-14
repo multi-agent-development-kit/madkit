@@ -66,6 +66,9 @@ CLEAN: [cantidad] áreas pasaron
 **Número de PR** → `gh pr view/diff <number>` → Pasos 1-3 → publicar resumen
 
 **"create"** → Pasos 1-3 en rama actual → si pasa:
+
+**BLOQUEANTE pre-creación:** verificar que el body no contiene `Co-Authored-By: Claude/anthropic`. Si está presente, eliminar antes de ejecutar `gh pr create`.
+
 ```bash
 gh pr create --title "<type>: <description>" --body "$(cat <<'EOF'
 ## Resumen
@@ -82,82 +85,45 @@ Reportar URL al usuario.
 
 ---
 
-## Paso 5: Estrategia de Stacking (activación condicional, T081)
-
-> Versión ligera del patrón de `gentle-ai/skills/chained-pr/SKILL.md` (376 líneas → ~70 líneas). NO replica diff hygiene exhaustivo ni reviewer guidance — `reviewer` cubre review post-impl.
+## Paso 5: Estrategia de Stacking (activación condicional)
 
 **Cuándo se activa este sub-flow:**
-- El task doc en curso (`ai_docs/tasks/NNN_*.md`) declara `> **Depende de:**` con 1+ IDs (T079), O
-- "Tamaño estimado" en "Impactos esperados" excede 400 líneas (T080), O
+- El task doc en curso (`ai_docs/tasks/NNN_*.md` o `NNN_sNN_*.md`) declara **`> **Sprint:** NN`**, O
+- El task doc declara `> **Depende de:**` con 1+ IDs, O
+- "Tamaño estimado" en "Impactos esperados" excede 400 líneas, O
 - El usuario explícitamente pide "abrir cadena de PRs" o "split en stacked PRs".
 
 **Cuándo NO se activa:**
-- Tarea aislada sin dependencias declaradas y forecast ≤400 → flujo PR estándar (Pasos 1-4 sin esta sección).
+- Tarea aislada sin dependencias declaradas, sin Sprint, y forecast ≤400 → flujo PR estándar (Pasos 1-4 sin esta sección).
 
 ### 5.1 — Decisión de strategy (preguntar UNA vez por sesión)
 
-Si `ai_docs/STATE.md` tiene `pr_strategy: <stacked|feature_chain|exception>` cacheado, reusar. Si no, preguntar al usuario:
+Si `ai_docs/STATE.md` tiene `pr_strategy` cacheado, reusar. Si no, presentar las 4 opciones al usuario:
 
-```
-Esta tarea requiere cadena de PRs. ¿Qué estrategia?
+| Strategy | Cuándo |
+|---|---|
+| **Sprint PR único** (default cuando sprint cierra todas las waves) | Sprint COMPLETADA: 1 PR a main agrupa N commits work-unit (1 por tarea). Granularidad por commit; rollback granular tarea-a-tarea. Subject del PR: `<type>: <título descriptivo de la épica>`. |
+| **Stacked PRs to main** | Slices independientes, velocidad sobre control |
+| **Feature Branch Chain** | Control de integración, releases coordinadas, mejor rollback |
+| **size:exception** | PR único grande con aprobación explícita (generado, migraciones, vendor) |
 
-1. Stacked PRs to main — cada PR mergea a main en orden. Rápido, fix-on-the-go.
-   Mejor para: equipos que priorizan velocidad, slices independientes.
+**Recomendación:** si la task pertenece a sprint Y todas las tasks del sprint están COMPLETADAS, sugerir **Sprint PR único** como default. El usuario puede degradar a Stacked PRs por wave si prioriza revisión wave-a-wave sobre velocidad.
 
-2. Feature Branch Chain (con tracker) — child PRs sobre rama padre; tracker PR
-   acumula la feature y mergea a main al final. Mejor rollback.
-   Mejor para: control de integración, releases coordinadas.
-
-3. size:exception — un solo PR grande con aprobación explícita.
-   Mejor para: código generado, migraciones, vendor diffs.
-```
-
-Cachear respuesta en `ai_docs/STATE.md` campo `pr_strategy`. NO volver a preguntar en waves siguientes.
+Cachear en `ai_docs/STATE.md` campo `pr_strategy`. NO volver a preguntar en waves siguientes.
 
 ### 5.2 — Diagrama Mermaid de la cadena
 
-Tomar las waves de task-planner (T079) y renderizar:
-
-```mermaid
-graph LR
-  main --> PR1[PR 1: Wave 1 - foundation]
-  PR1 --> PR2[PR 2: Wave 2 - feature]
-  PR2 --> PR3[PR 3: Wave 3 - tests]
-```
-
-Marcar el PR actual con etiqueta visible.
+Renderizar `graph LR` con las waves de task-planner: `main → PR1[Wave 1] → PR2[Wave 2] → ...`. Marcar el PR actual con etiqueta visible.
 
 ### 5.3 — Bloque "Chain Context" en el PR body
 
-Añadir al `--body` (ANTES del Test Plan):
-
-```markdown
-## Chain Context
-
-| Field | Value |
-|-------|-------|
-| Chain | <feature name> |
-| Tracker PR | <#NNN o "N/A si stacked"> |
-| Position | <N de M> |
-| Base | `<branch>` |
-| Depende de | <PR/issue o "None"> |
-| Follow-up | <next PR o "None"> |
-| Review budget | <changed lines> / 400 |
-
-### Chain Overview
-<diagrama Mermaid del 5.2>
-
-### Autonomy
-- [ ] CI verde para esta rama
-- [ ] Un único deliverable
-- [ ] Rollback aislado posible
-- [ ] Tests/docs cubren esta unidad
-```
+Añadir antes del Test Plan. Campos requeridos: Chain · Tracker PR (`#NNN` o `N/A si stacked`) · Position (`N de M`) · Base branch · Depende de · Follow-up · Review budget (`<changed lines> / 400`). Incluir el diagrama Mermaid del 5.2 y checklist de autonomy (CI verde · deliverable único · rollback aislado · tests/docs cubren esta unidad).
 
 ### 5.4 — Comandos `gh` con bases correctas
 
 | Strategy | Comando |
 |---|---|
+| **Sprint PR único** | `gh pr create --base main --head <sprint_branch> --title "<type>: <título descriptivo de la épica>"`. Body: lista de unidades completadas (1 por commit work-unit con su mensaje descriptivo), DAG §4 del sprint doc, plan de pruebas con checklist por unidad. |
 | **Stacked PRs to main** | `gh pr create --base main --head <wave_branch>`. Tras merge de PR N, retargetear PR N+1 a main y rebase. |
 | **Feature Branch Chain** | PR 1: `gh pr create --base feat/<feature> --head <child_branch>`. PR N (N>1): `gh pr create --base <branch_de_PR_N-1> --head <child_branch>`. Tracker PR `feat/<feature> → main` en `--draft` hasta cierre. |
 | **size:exception** | PR único, justificar tamaño en `--body`: `> **size:exception:** <razón>`. |
@@ -178,3 +144,4 @@ Añadir al `--body` (ANTES del Test Plan):
 2. **Nunca crear PR con archivos de scaffolding**
 3. **Presentar revisión antes de crear** — el usuario aprueba
 4. **Código muerto se elimina**, no se documenta con TODOs
+5. **`Co-Authored-By: Claude/anthropic` prohibido** en body y título — control primario; scaffolding-guard es red de seguridad secundaria

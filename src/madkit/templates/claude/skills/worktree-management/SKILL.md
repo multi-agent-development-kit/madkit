@@ -36,7 +36,46 @@ Ejemplo: `/worktree auth` en `/code/myapp` → `/code/myapp-auth/`, branch: `fea
 
 ---
 
+## Paso 0: Health-check de viabilidad
+
+Antes de crear el worktree, verificar señales de proyecto git restrictivo. Si se detecta ≥1 señal y NO se pasó flag `--force`, **degradar a branch normal en cwd actual** con warning estructurado.
+
+### Las 7 señales restrictivas
+
+```bash
+# Detección barata, deterministic, todas exit 0/1.
+[ "$(git config --get core.sparseCheckout 2>/dev/null)" = "true" ]              && echo "sparse-checkout"
+[ -n "$(git config --get extensions.partialClone 2>/dev/null)" ]                 && echo "partial-clone"
+[ -f .gitmodules ]                                                                && echo "submodules"
+grep -q 'filter=lfs' .gitattributes 2>/dev/null                                   && echo "git-lfs"
+[ "$(git config --get commit.gpgsign 2>/dev/null)" = "true" ]                    && echo "gpg-signing"
+[ -d .husky ] && [ "$(du -sb .husky 2>/dev/null | cut -f1)" -gt 5000 ]           && echo "husky-heavy"
+[ -f .git/hooks/pre-commit ] && [ "$(wc -c < .git/hooks/pre-commit)" -gt 1024 ]   && echo "pre-commit-heavy"
+```
+
+### Comportamiento por escenario
+
+| Señales detectadas | Flag `--force` | Acción |
+|---|---|---|
+| 0 | (ignorado) | Continuar al actual `## CREATE` (worktree). |
+| ≥1 | NO | **Degradar a branch normal:** ejecutar `git checkout -b feat/{name}` o `fix/{name}` en cwd actual; emitir warning. NO crear worktree. NO copiar `.env*`. NO `npm install` extra. |
+| ≥1 | SÍ | Continuar con worktree pero emitir warning informativo del riesgo. Usuario asume consecuencias. |
+
+### Output del warning (degradación a branch)
+
+Emitir: señales detectadas + riesgo por señal (`sparse-checkout` → worktree add puede fallar; `submodules` → no se inicializan; `git-lfs` → smudge filter duplicado; `gpg-signing`/`husky-heavy` → hooks corren dos veces) + acción tomada (branch normal `feat|fix/{name}`) + instrucción de override (`--force`).
+
+### Casos límite
+
+- Repo sin git inicializado: `git config` falla → emitir error claro "no es un git repo" y exit. NO degradar silenciosamente.
+- `.gitattributes` ausente: grep retorna exit 1 → considerar señal `git-lfs = false` (no falso positivo).
+- Repo sin `.git/hooks/pre-commit`: condición false, no se cuenta como señal.
+
+---
+
 ## CREATE
+
+> **Pre-requisito:** Paso 0 health-check pasó con 0 señales o flag `--force` aplicado.
 
 1. Validar que estamos en repo git, `git fetch origin`
 2. Verificar conflictos: branch existente, directorio existente
@@ -44,18 +83,7 @@ Ejemplo: `/worktree auth` en `/code/myapp` → `/code/myapp-auth/`, branch: `fea
 4. **Copiar archivos `.env*`** del proyecto principal (raiz + apps en monorepos)
 5. Instalar dependencias (`npm install` / `uv sync`)
 
-**Reporte al usuario:**
-```
-Worktree Created
-Location: {WORKTREE_DIR}
-Branch:   {BRANCH_NAME} (based on origin/main)
-
-  cd {WORKTREE_DIR}
-  PORT=3001 npm run dev    # usar puertos diferentes por worktree
-  claude --cwd {WORKTREE_DIR}
-
-When done: commit, push, PR, /worktree remove {name}
-```
+Reportar: `Location: {WORKTREE_DIR} | Branch: {BRANCH_NAME}` + comandos de inicio (`cd {WORKTREE_DIR}`, `PORT=3001 npm run dev`, `claude --cwd {WORKTREE_DIR}`) + recordatorio de cierre (`/worktree remove {name}`).
 
 ## LIST
 
@@ -78,19 +106,3 @@ git worktree list
 - **Monorepos:** Copiar `.env*` desde cada `apps/*/` ademas de raiz
 - **Claude Code:** Cada worktree puede ejecutar su propia instancia via `claude --cwd`
 
----
-
-## Ready Prompt
-
-```text
-Eres Worktree Manager.
-
-Rutas: WORKTREE_DIR="$(dirname $(pwd))/$(basename $(pwd))-{name}"
-Branches: contiene fix/bug/hotfix -> fix/{name}, sino -> feat/{name}
-
-CREATE: validar -> verificar conflictos -> fetch -> crear worktree -> copiar .env -> instalar deps -> reportar
-LIST: git worktree list
-REMOVE: verificar cambios -> eliminar worktree -> preguntar sobre branch -> confirmar
-
-Listo para gestionar worktrees. Que deseas hacer?
-```

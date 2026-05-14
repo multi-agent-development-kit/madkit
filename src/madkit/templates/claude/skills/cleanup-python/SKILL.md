@@ -31,11 +31,12 @@ Confirmar: `pyproject.toml` + `uv.lock` + archivos `.py`. Detectar grupos de dep
 
 **Nunca uses `pip install`.** Este proyecto usa `uv` como único gestor.
 
-**Grupos de dependencias:**
-- `[project.dependencies]` → runtime
-- `[dependency-groups.dev]` → desarrollo (formatting, type checking)
-- `[dependency-groups.test]` → testing
-- `[dependency-groups.lint]` → calidad de código (ruff, black, mypy)
+| Grupo | Paquetes típicos |
+|---|---|
+| `[project.dependencies]` | runtime |
+| `[dependency-groups.dev]` | desarrollo (formatting, type checking) |
+| `[dependency-groups.test]` | testing |
+| `[dependency-groups.lint]` | calidad de código (ruff, black, mypy) |
 
 ```bash
 uv add "package>=1.0.0"              # runtime
@@ -83,31 +84,17 @@ Usa `collections.abc` para: `AsyncGenerator`, `Generator`, `Iterator`, `Callable
 
 **NUNCA usar `Any` en código nuevo o modificado** — siempre encontrar e importar los tipos apropiados del framework/biblioteca. Si el tipo correcto no puede determinarse, **detenerse y preguntar**. `Any` preexistente en código no modificado → reportar, no forzar eliminar.
 
-```bash
-grep -r ": Any\|-> Any\|Any]" . --include="*.py" --exclude-dir=__pycache__
-# Debe retornar vacío
-```
-
-### Tipos de Framework: Importar, No Inventar
-
-```python
-# ❌ MAL
-state: Any
-
-# ✅ BIEN
-from google.adk.sessions import State
-state: State
-```
+**Tipos de framework: importar, no inventar.** Cada framework (ADK, FastAPI, Pydantic, etc.) expone tipos propios — usar los tipos del módulo en lugar de `Any` o tipos genéricos inventados.
 
 ---
 
-## Scope de Limpieza
+## Scope y Prioridad de Limpieza
 
-- **Solo archivos de la tarea actual.** No expandir limpieza a módulos adyacentes. Issues fuera del scope → documentar como nota, no actuar.
-- **Antes de eliminar código "muerto":** Verificar que no se use vía dynamic imports, decoradores, entry points, plugins, CLI commands o side effects. En caso de duda → NO eliminar, preguntar al usuario.
-- **`# type: ignore` / `Any` en código no modificado por la tarea** → reportar, no eliminar automáticamente. Pueden ser decisiones intencionales en integraciones externas o código legacy.
+> Reglas de scope universales: ver `cleanup/SKILL.md` §Scope de Limpieza.
 
-## Orden de Prioridad de Limpieza
+**Python específico:** antes de eliminar código "muerto", verificar que no se use vía dynamic imports, decoradores, entry points, plugins, CLI commands o side effects. En duda → NO eliminar, preguntar.
+
+**Prioridad:**
 
 1. **Errores críticos** — imports rotos, sintaxis inválida, `ruff` errores de categoría E
 2. **Código muerto confirmado** — funciones/clases sin ninguna referencia (solo en archivos de la tarea), imports F401
@@ -119,13 +106,11 @@ state: State
 ## Comandos de Análisis
 
 ```bash
-# Acotar a archivos de la tarea actual (<archivos> = archivos modificados)
 uv run ruff check --select F401,F841 --output-format=full <archivos>  # imports/vars no usadas
 uv run ruff check --output-format=full <archivos>                      # análisis completo
 uv run mypy <archivos>                                                  # verificación de tipos
 grep -r "type: ignore" <archivos>                                       # supresiones
 uv tree                                                                 # árbol de deps (informativo)
-grep -r "print(" <archivos>                                             # prints en prod
 ```
 
 ## Dependencias en `pyproject.toml`

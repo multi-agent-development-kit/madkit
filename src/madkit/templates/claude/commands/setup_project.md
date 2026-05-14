@@ -1,14 +1,12 @@
 # Setup de Proyecto
 
-> **Propósito:** Análisis profundo de la infraestructura de documentación `ai_docs/` — reconocimiento del stack, inventario y evaluación de calidad de docs core, detección de drift entre documentación y código, y reporte técnico con plan de acción priorizado. **Requiere razonamiento LLM en cada fase.**
+> **Propósito:** Bootstrap completo de la infraestructura de documentación `ai_docs/` + análisis profundo — Fase 1 mecánica (crea estructura `ai_docs/{core,tasks,refs}/`, copia `CLAUDE.md.template`, despliega scaffolding, instala hooks opt-in si procede) + Fases 0/2/3/4/5 analíticas (reconocimiento del stack, inventario y calidad de docs core, drift, reporte con plan de acción). **Requiere razonamiento LLM en las fases analíticas.**
 
-> **División mecánico vs analítico (desde madkit v0.1.0):** el bootstrap **mecánico** (crear `ai_docs/{core,tasks,refs}/`, copiar `CLAUDE.md.template`, scaffolding del IDE, hooks opt-in) lo hace el CLI `madkit iniciar` sin LLM. Este slash empieza desde la Fase 0 (Reconocimiento) **asumiendo que esa estructura ya existe**. Si no se ha ejecutado `madkit iniciar` y el proyecto no tiene `ai_docs/`, el slash sigue funcionando en modo standalone (Fase 1 mecánica + Fases 0/2/3/4/5 analíticas) — pero la ruta recomendada es `madkit iniciar` primero.
-
-> **Cuándo usar:** Tras `madkit iniciar` (recomendado), o como reemplazo si prefieres flujo manual. Re-ejecutar si se sospecha que la documentación está desactualizada respecto al código.
+> **Cuándo usar:** En cualquier proyecto nuevo o existente que aún no tiene `ai_docs/` configurado. Re-ejecutar si se sospecha que la documentación está desactualizada respecto al código.
 
 > **Flujo recomendado:**
-> - **Proyecto nuevo:** `madkit iniciar .` → `setup_project` → template `01_generar_idea_maestra.md` (pipeline 01-08) → `calibrate_templates`
-> - **Proyecto existente:** `madkit iniciar .` → `setup_project` → template `00_incorporacion_proyecto.md` (reconocimiento + scope) → templates selectivos según scope → `calibrate_templates`
+> - **Proyecto nuevo:** `setup_project` → template `01_generar_idea_maestra.md` (pipeline 01-08) → skill `calibrate-templates`
+> - **Proyecto existente:** `setup_project` → template `00_incorporacion_proyecto.md` (reconocimiento + scope) → templates selectivos según scope → skill `calibrate-templates`
 
 ---
 
@@ -22,6 +20,20 @@
 # 1. Instrucciones del proyecto (fuente primaria de convenciones y restricciones)
 cat CLAUDE.md 2>/dev/null || echo "NO ENCONTRADO: CLAUDE.md"
 cat .cursorrules 2>/dev/null || echo "NO ENCONTRADO: .cursorrules"
+
+# 1b. Detectar ai_docs/ huérfanos en padres e hijos (split-workspace y monorepo post-hoc)
+# Busca ai_docs/ canónico y variantes de naming case-insensitive
+find ../ -maxdepth 2 -type d -iname "ai_docs" 2>/dev/null     # ai_docs en directorio padre
+find . -maxdepth 3 -type d -iname "ai_docs" 2>/dev/null       # ai_docs en hijos visibles
+# Variantes de naming no canónicas
+find . -maxdepth 3 -type d \( -iname "ai-docs" -o -iname "ai_doc" -o -iname "AIDocs" \) 2>/dev/null
+# Si se encuentra ≥1 candidato fuera del cwd O alguna variante de naming:
+# → Presentar lista al usuario y preguntar antes de crear estructura nueva:
+#   (a) Usar el existente declarándolo en .claude/.ai_docs_path
+#   (b) Migrar contenido al cwd canónico
+#   (c) Crear nuevo (requiere confirmación explícita — deja el otro huérfano)
+# Si variante de naming encontrada: preguntar si renombrar a canónico ai_docs/
+# NO renombrar automáticamente — puede romper referencias en CLAUDE.md o scripts del proyecto.
 
 # 2. Estructura del proyecto (entender la topología del repositorio)
 ls -la 2>/dev/null
@@ -134,11 +146,65 @@ ls -d ai_docs/dev_templates/ 2>/dev/null && echo "ACTUAL: dev_templates/"
 
 ### 1.2 Garantizar Estructura de Directorios
 
+<!-- AI Agent: Detectar split-workspace ANTES de crear directorios.
+     En proyectos canónicos (cwd == git toplevel) el bloque de detección no actúa. -->
+
+```bash
+# Detección de split-workspace antes de crear ai_docs/
+GIT_TOPLEVEL=$(git rev-parse --show-toplevel 2>/dev/null)
+CURRENT_DIR=$(pwd)
+
+if [ -n "$GIT_TOPLEVEL" ] && [ "$GIT_TOPLEVEL" != "$CURRENT_DIR" ]; then
+  # cwd está dentro de un git repo pero NO en su toplevel — split-workspace potencial.
+  # Presentar opciones al usuario:
+  #   (1) Usar git toplevel (recomendado): ai_docs/ vive junto al código
+  #   (2) Usar cwd actual: .claude/ y ai_docs/ coexisten en el mismo directorio
+  #   (3) Especificar otro subdirectorio git
+  # Según la elección: hacer cd <ruta_elegida> y escribir .claude/.ai_docs_path si no es cwd.
+  echo "SPLIT-WORKSPACE detectado: git toplevel=$GIT_TOPLEVEL, cwd=$CURRENT_DIR"
+  echo "→ Preguntar al usuario dónde debe vivir ai_docs/ antes de continuar."
+elif [ -z "$GIT_TOPLEVEL" ]; then
+  # No estamos en ningún repo git — buscar subdirectorios git visibles.
+  SUB_REPOS=$(find . -maxdepth 2 -type d -name ".git" 2>/dev/null | sed 's|/.git||')
+  if [ -n "$SUB_REPOS" ]; then
+    echo "No-git cwd con subdirectorios git detectados: $SUB_REPOS"
+    echo "→ Preguntar al usuario cuál es el 'project root' para Claude Code."
+  else
+    echo "No-git cwd sin subdirectorios git visibles."
+    echo "→ Preguntar al usuario dónde quiere que viva ai_docs/."
+  fi
+  # En cualquiera de los dos casos anteriores: crear .claude/.ai_docs_path
+  # con la ruta absoluta elegida antes de los mkdir -p.
+fi
+# Si GIT_TOPLEVEL == CURRENT_DIR → caso canónico. NO crear .ai_docs_path. Continuar.
+```
+
+**Acción según resultado:**
+
+| Caso | Acción |
+|---|---|
+| `GIT_TOPLEVEL == CURRENT_DIR` | Caso canónico — NO crear `.ai_docs_path`. Continuar con `mkdir -p` en cwd. |
+| `GIT_TOPLEVEL != CURRENT_DIR` (detectado) | Presentar 3 opciones al usuario. Crear `.claude/.ai_docs_path` con la ruta elegida. |
+| No-git cwd + subdirs git visibles | Presentar opciones de subdir. Crear `.claude/.ai_docs_path` con la ruta elegida. |
+| No-git cwd + sin subdirs git | Preguntar al usuario explícitamente "¿dónde quieres que viva `ai_docs/`?". Crear `.ai_docs_path` con la ruta indicada. |
+
+**Crear `.claude/.ai_docs_path` (solo en casos no-canónicos):**
+
+```bash
+# Escribir .claude/.ai_docs_path con la ruta absoluta elegida (texto plano UTF-8)
+# Ejemplo si el usuario elige /home/user/mi-proyecto como root de ai_docs/:
+echo "/home/user/mi-proyecto/ai_docs" > .claude/.ai_docs_path
+# El archivo NO se crea en proyectos canónicos (cwd == git toplevel).
+```
+
 ```bash
 # Crear estructura canónica (mkdir -p es idempotente)
-mkdir -p ai_docs/core
-mkdir -p ai_docs/core_templates
+# Si se eligió ruta no-canónica, hacer cd a esa ruta antes de los mkdir -p
+mkdir -p ai_docs/core         # project memory: 4 docs canónicos (ver CLAUDE.md §"Inventario canónico de ai_docs/core/")
+mkdir -p ai_docs/_meta        # operativos managed-by-tooling: ecosystem_state, setup_report, framework_versions
+mkdir -p ai_docs/core_templates   # pipeline opcional per-proyecto (NO se distribuye desde el meta-repo)
 mkdir -p ai_docs/tasks
+mkdir -p ai_docs/sprints      # roadmaps de épicas opcionales
 mkdir -p ai_docs/refs
 ```
 
@@ -164,7 +230,7 @@ grep -n "ai_docs" .gitignore 2>/dev/null
 find ai_docs/ -maxdepth 1 -type d 2>/dev/null | sort
 ```
 
-**Carpetas estándar esperadas:** `core/`, `core_templates/`, `tasks/`, `refs/`, `dev_templates/`
+**Carpetas estándar esperadas:** `core/`, `_meta/`, `core_templates/`, `tasks/`, `sprints/`, `refs/`, `dev_templates/`
 
 Si se detectan carpetas no estándar (ej. `ai_docs/old/`, `ai_docs/backup/`, `ai_docs/archive/`):
 - Listar contenido brevemente
@@ -179,7 +245,7 @@ Si se detectan carpetas no estándar (ej. `ai_docs/old/`, `ai_docs/backup/`, `ai
 ls CLAUDE.md 2>/dev/null
 
 # Detectar template base del framework (desplegado junto con las plantillas)
-ls .claude/CLAUDE.md.template 2>/dev/null || ls claude-templates/CLAUDE.md.template 2>/dev/null
+ls .claude/CLAUDE.md.template 2>/dev/null
 ```
 
 **Reglas:**
@@ -188,30 +254,33 @@ ls .claude/CLAUDE.md.template 2>/dev/null || ls claude-templates/CLAUDE.md.templ
 |---|---|
 | `CLAUDE.md` existe + tiene secciones "Estilo de respuesta", "Modelo por perfil de trabajo", "Cuándo delegar a subagentes" | Registrar: "CLAUDE.md presente y completo" — no hacer nada |
 | `CLAUDE.md` existe pero faltan secciones del template | **Preguntar al usuario** antes de mergear. Proponer añadir las secciones faltantes sin tocar el resto |
-| `CLAUDE.md` NO existe + template disponible | Copiar `CLAUDE.md.template` → `CLAUDE.md`. Los placeholders `[entre corchetes]` se rellenan en Fase 3.3 de `/calibrate_templates`. Registrar: "CLAUDE.md generado desde template — placeholders pendientes de calibración" |
+| `CLAUDE.md` NO existe + template disponible | Copiar `CLAUDE.md.template` → `CLAUDE.md`. Los placeholders `[entre corchetes]` se rellenan en Fase 3.3 de la skill `calibrate-templates`. Registrar: "CLAUDE.md generado desde template — placeholders pendientes de calibración" |
 | `CLAUDE.md` NO existe + template NO disponible | Registrar: "CLAUDE.md faltante y template no disponible — recomendar redesplegar plantillas" |
 
 **Regla crítica:** NUNCA sobrescribir un `CLAUDE.md` existente sin confirmación del usuario — puede contener reglas del proyecto que el template genérico no cubre.
 
 ### 1.6 Hooks deployables (opt-in)
 
-<!-- AI Agent: Ofrecer instalación de hooks opcionales del framework. Cero por defecto — el usuario elige. Ver claude-templates/hooks/README.md para inventario completo. -->
+<!-- AI Agent: Ofrecer instalación de hooks opcionales del framework. Cero por defecto — el usuario elige. Ver .claude/hooks/README.md para inventario completo. -->
 
 ```bash
-# Detectar disponibilidad de los hooks en el repo upstream
-ls claude-templates/hooks/ 2>/dev/null
+# Detectar disponibilidad de los hooks ya instalados
+ls .claude/hooks/ 2>/dev/null
 ```
 
 **Si los hooks están disponibles, preguntar al usuario:**
 
 ```
-¿Instalar hooks deployables? (ver `claude-templates/hooks/README.md`)
-  [a] Sí, todos (context-monitor + prompt-guard + scaffolding-guard + task-doc-validator + session-state) — loop completo de continuidad
-  [b] Solo planning (task-doc-validator + scaffolding-guard) — refuerza calidad de task docs y commits
-  [c] Solo seguridad (prompt-guard + scaffolding-guard)
+¿Instalar hooks deployables? (ver `.claude/hooks/README.md`)
+  [a] Sí, todos (context-monitor + prompt-guard + read-injection-scanner + scaffolding-guard + task-doc-validator + session-state + sprint-doc-validator + sprint-sync + core-context-loader) — loop completo + defense-in-depth WRITE+READ + bidireccionalidad sprint + contexto de core/ en SessionStart
+  [b] Solo planning (task-doc-validator + scaffolding-guard + sprint-sync) — refuerza calidad de task docs, commits y coherencia con sprints
+  [c] Solo seguridad (prompt-guard + read-injection-scanner + scaffolding-guard) — capa completa WRITE-time y READ-time
   [d] Solo visibilidad y continuidad (context-monitor + session-state) — escribe + lee STATE.md
   [e] No, configurar manualmente luego
-  [f] Solo session-state (T081) — útil si ya tienes context-monitor activo y quieres cerrar el loop
+  [f] Solo session-state — útil si ya tienes context-monitor activo y quieres cerrar el loop
+  [g] Solo read-injection-scanner — advisory READ-time para sesiones largas con context compression
+  [h] Solo sprint-sync — advisory bidireccionalidad task↔sprint, útil si el proyecto usa la skill roadmap-generator
+  [i] Solo core-context-loader — inyecta ai_docs/core/ en cada SessionStart; cierra el gap de coherencia con contratos del proyecto
 Por defecto: [e]
 ```
 
@@ -219,41 +288,138 @@ Por defecto: [e]
 
 | Opción | Hooks copiados | Flags activadas en `.claude/hooks/config.json` |
 |---|---|---|
-| a | los 5 | `context_monitor: true`, `prompt_guard.mode: "advisory"`, `scaffolding_guard: true`, `task_doc_validator: true`, `session_state: true` |
-| b | task-doc-validator + scaffolding-guard | `task_doc_validator: true`, `scaffolding_guard: true` |
-| c | prompt-guard + scaffolding-guard | `prompt_guard.mode: "advisory"`, `scaffolding_guard: true` |
+| a | los 9 | `context_monitor: true`, `prompt_guard.mode: "advisory"`, `read_injection_scanner: true`, `scaffolding_guard: true`, `task_doc_validator: true`, `session_state: true`, `sprint_doc_validator.mode: "advisory"`, `sprint_sync.mode: "advisory"`, `core_context_loader: true` |
+| b | task-doc-validator + scaffolding-guard + sprint-sync | `task_doc_validator: true`, `scaffolding_guard: true`, `sprint_sync.mode: "advisory"` |
+| c | prompt-guard + read-injection-scanner + scaffolding-guard | `prompt_guard.mode: "advisory"`, `read_injection_scanner: true`, `scaffolding_guard: true` |
 | d | context-monitor + session-state | `context_monitor: true`, `session_state: true` |
 | e | ninguno | (no se crea config.json) |
 | f | session-state | `session_state: true` |
+| g | read-injection-scanner | `read_injection_scanner: true` |
+| h | sprint-sync | `sprint_sync.mode: "advisory"` |
+| i | core-context-loader | `core_context_loader: true` |
 
-**Si el usuario elige a/b/c/d/f:**
+**Si el usuario elige a/b/c/d/f/g/h/i:**
 
 ```bash
-# Crear directorio destino
+# Crear directorio destino (si no existe)
 mkdir -p .claude/hooks
 
-# Copiar hooks elegidos (ejemplo opción a — todos)
-cp claude-templates/hooks/context-monitor.js .claude/hooks/
-cp claude-templates/hooks/prompt-guard.js .claude/hooks/
-cp claude-templates/hooks/scaffolding-guard.sh .claude/hooks/
-cp claude-templates/hooks/scaffolding-guard.ps1 .claude/hooks/
-cp claude-templates/hooks/task-doc-validator.js .claude/hooks/
-cp claude-templates/hooks/session-state.sh .claude/hooks/
-cp claude-templates/hooks/session-state.ps1 .claude/hooks/
+# Los hooks viajan con el comando sync-upstream-trigger (script sync_templates.{ps1,sh}).
+# Verificar presencia. Si faltan, abortar Fase 1.6 con instrucción accionable.
+HOOKS_REQUIRED="hook-runner.js context-monitor.js prompt-guard.js read-injection-scanner.js scaffolding-guard.sh scaffolding-guard.ps1 scaffolding-guard.js task-doc-validator.js session-state.sh session-state.ps1 sprint-doc-validator.js sprint-sync.js core-context-loader.sh core-context-loader.ps1"
+HOOKS_MISSING=""
+for h in $HOOKS_REQUIRED; do
+  [ -f ".claude/hooks/$h" ] || HOOKS_MISSING="$HOOKS_MISSING $h"
+done
 
-# Generar config.json desde el example
-cp claude-templates/hooks/config.example.json .claude/hooks/config.json
+if [ -n "$HOOKS_MISSING" ]; then
+  echo "Hooks faltantes en .claude/hooks/:$HOOKS_MISSING"
+  echo "Ejecutar el comando sync-upstream-trigger antes de continuar Fase 1.6 — los hooks se copian desde upstream, no se generan en setup."
+  exit 1
+fi
+
+# Generar config.json desde el example si no existe aún
+[ -f .claude/hooks/config.json ] || cp .claude/hooks/config.example.json .claude/hooks/config.json
 # Editar config.json para activar solo las flags correspondientes a la opción
 ```
 
-**Editar `.claude/settings.json`** del proyecto destino para registrar los triggers de los hooks copiados. Ver `claude-templates/hooks/README.md` §"Instalación manual" para el formato JSON exacto. Si `.claude/settings.json` no existe, crearlo con el bloque `hooks` mínimo.
+**Detección preventiva de runtimes:** los hooks JS requieren Node ≥20 disponible para Claude Code al spawnear el shell. Antes de wirear:
+
+```bash
+NODE_OK=$(command -v node >/dev/null 2>&1 && node --version 2>/dev/null || echo "MISSING")
+[ "$NODE_OK" = "MISSING" ] && echo "WARN: node no resuelto en este shell — los hooks JS fallarán silenciosos. Instalar Node ≥20 antes de usar la wiring."
+# Mismo check opcional para 'bash' (POSIX) y 'pwsh' (Windows) según sistema operativo del destino.
+```
+
+Advertir al usuario sin abortar — los hooks tienen exit silencioso de fábrica, pero los errores `MODULE_NOT_FOUND` cuando node está ausente NO son silenciosos en Claude Code; mejor que el usuario lo sepa antes.
+
+**Generar `.claude/settings.json` automáticamente** con paths absolutos `$CLAUDE_PROJECT_DIR/.claude/hooks/<file>` (cwd-independent). Idempotente: si `settings.json` ya existe, merge en lugar de overwrite — preservar claves `permissions`, `env`, etc.
+
+> **Tabla canónica replicada.** El mapping hook→matcher de abajo se duplica en `scripts/sync_templates.{sh,ps1}` Paso 1.8 (auto-wiring de hooks nuevos al sincronizar upstream). Test cross-file `claude-templates/hooks/tests/settings-wiring.test.js` A1 valida que ambas tablas no diverjan. Si añades un hook nuevo aquí, actualiza la tabla en ambos scripts (y el test).
+
+```bash
+SETTINGS=".claude/settings.json"
+
+# Construir el bloque hooks JSON según opción elegida (a/b/c/d/f/g/h/i).
+# Los 4 hooks JS de Write|Edit (prompt-guard, task-doc-validator, sprint-sync,
+# sprint-doc-validator) se BUNDLEAN en un único spawn de Node vía hook-runner.js
+# (in-process). Reduce p95 de 717ms→150ms en Windows (evita 4× escaneos AV
+# concurrentes). Los hooks PostToolUse y SessionStart no se bundlean: cada uno
+# está solo en su matcher.
+# Ejemplo opción [a] = los 9 hooks:
+NEW_HOOKS=$(cat <<'EOF'
+{
+  "PreToolUse": [
+    {"matcher": "Write|Edit", "hooks": [{"type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/hook-runner.js\" prompt-guard task-doc-validator sprint-sync sprint-doc-validator"}]},
+    {"matcher": "Bash|PowerShell", "hooks": [{"type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/scaffolding-guard.js\""}]}
+  ],
+  "PostToolUse": [
+    {"matcher": "*", "hooks": [{"type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/context-monitor.js\""}]},
+    {"matcher": "Read", "hooks": [{"type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/read-injection-scanner.js\""}]}
+  ],
+  "SessionStart": [
+    {"hooks": [{"type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-state.sh\""}]},
+    {"hooks": [{"type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/core-context-loader.sh\""}]}
+  ]
+}
+EOF
+)
+
+# Para Windows nativo: reemplazar 'bash "$CLAUDE_PROJECT_DIR/...sh"' por
+#   pwsh -File "$env:CLAUDE_PROJECT_DIR\.claude\hooks\<file>.ps1"
+# en session-state y core-context-loader.
+# scaffolding-guard usa node (scaffolding-guard.js) — cross-platform, no requiere sustitución.
+
+# Merge idempotente
+if [ -f "$SETTINGS" ]; then
+  # Merge con node (ya disponible en el destino). Preserva claves no-hooks.
+  node -e "
+    const fs=require('fs');
+    const cur=JSON.parse(fs.readFileSync('$SETTINGS','utf8'));
+    const add=$NEW_HOOKS;
+    cur.hooks = Object.assign({}, cur.hooks||{}, add);
+    fs.writeFileSync('$SETTINGS', JSON.stringify(cur, null, 2));
+  " || { echo "ERROR: no se pudo mergear settings.json"; exit 1; }
+else
+  mkdir -p .claude
+  printf '{\n  "hooks": %s\n}\n' "$NEW_HOOKS" > "$SETTINGS"
+fi
+
+# Validar JSON resultante (rollback con .bak si parser falla)
+node -e "JSON.parse(require('fs').readFileSync('$SETTINGS','utf8'))" || { echo "ERROR: settings.json invalido tras merge"; exit 1; }
+```
+
+Para opciones b/c/d/f/g/h/i incluir solo los triggers de los hooks correspondientes a la opción (ver tabla §Acciones según elección). Mismo esquema `$CLAUDE_PROJECT_DIR`.
 
 **Documentar en el reporte final:**
 - Hooks instalados (lista de archivos copiados)
-- Opción elegida (a/b/c/d/e)
-- Flag para troubleshooting: si un hook tarda más de su timeout duro, exit silencioso (no rompe flujo del agent)
+- Opción elegida (a/b/c/d/e/f/g/h/i)
+- Wiring `settings.json` generada (o `--no-wiring` si el usuario opted out)
+- Resultado de detección de runtimes (`node` / `bash` / `pwsh` disponibles o WARN)
+- Flag para troubleshooting: si un hook tarda más de su timeout duro, exit silencioso (no rompe flujo del agent). Errores `MODULE_NOT_FOUND` post-wiring → verificar que `node` resuelve en el shell que usa Claude Code y que `$CLAUDE_PROJECT_DIR` se expande (no es una limitación de los hooks, es del entorno del shell)
 
 **Regla:** los hooks NO cuentan como templates. El conteo total de templates del framework no cambia tras instalarlos.
+
+---
+
+### 1.7 Contexto de arranque en CLAUDE.md
+
+<!-- AI Agent: Basándose en el perfil detectado en Fase 0, añadir al CLAUDE.md copiado
+     (antes de "## Prohibiciones del proyecto") un bloque "## Contexto de arranque".
+     Idempotente: si el bloque ya existe (grep "## Contexto de arranque"), omitir. -->
+
+**Detección (usar datos de Fase 0):**
+- `nuevo`: commits = 0 O `ai_docs/core/master_idea.md` no existe
+- `sprint-activo`: `ai_docs/sprints/*.md` con status != COMPLETADO
+- `brownfield`: cualquier otro caso (fallback conservador)
+
+**Bloque a inyectar según tipo:**
+
+- **NUEVO** → `**Primera acción:** completar \`ai_docs/core/master_idea.md\` → skill \`calibrate-templates\` → \`task-planner\` con la primera feature.`
+- **BROWNFIELD** → `**Primera acción:** \`researcher\` sobre el módulo con más actividad reciente (\`git log --since="30 days ago"\`) → \`doc-syncer\` → \`task-planner\`.`
+- **SPRINT ACTIVO** → `**Primera acción:** leer \`ai_docs/sprints/NN_*.md\` → verificar wave pendiente → \`plan-checker × N\` paralelo → \`implementer × N\`.`
+
+**Registro:** añadir al log de Fase 5: `"Contexto de arranque inyectado: [tipo]"`.
 
 ---
 
@@ -261,21 +427,26 @@ cp claude-templates/hooks/config.example.json .claude/hooks/config.json
 
 <!-- AI Agent: Análisis exhaustivo de CADA documento en ai_docs/core/. LEER el contenido real de cada archivo — no limitarse a verificar existencia. Evaluar calidad con criterios objetivos. -->
 
-### 2.1 Catálogo de Documentos Esperados
+### 2.1 Inventario Canónico de Documentos Core
 
-**Documentos core clasificados por criticidad:**
+**Project memory (`ai_docs/core/`) — 4 docs canónicos. Ver `CLAUDE.md` §"Inventario canónico de ai_docs/core/" para la SSOT.**
 
-| Prioridad | Documento | Propósito en la Ingeniería del Software | Dependencias |
-|-----------|-----------|------------------------------------------|--------------|
-| **P0 — Esencial** | `master_idea.md` | Visión de producto, contexto del proyecto (greenfield/existente), problema, usuarios, modelo de negocio, funcionalidades MVP, scope negativo, restricciones (equipo, presupuesto, timeline), user stories. Documento fundacional. | Ninguna. Generado por `01_generar_idea_maestra.md` (greenfield) o `00_incorporacion_proyecto.md` (existente) |
-| **P0 — Esencial** | `initial_data_schema.md` | Modelo de datos estratégico: entidades, relaciones, mapeo feature-to-data, decisiones de schema. | `master_idea.md`, `app_pages_and_functionality.md`. Generado por `06_generar_modelos_datos.md` |
-| **P1 — Recomendado** | `app_pages_and_functionality.md` | Blueprint de páginas, funcionalidad por página, navegación, stack detectado, checkpoint MVP. | `master_idea.md`. Generado por `04_generar_paginas_funcionalidad.md` |
-| **P1 — Recomendado** | `system_architecture.md` | Arquitectura técnica: diagrama Mermaid, estructura de rutas, patrones backend, seguridad, deployment, riesgos. | `master_idea.md`, `app_pages_and_functionality.md`. Generado por `07_generar_diseno_sistema.md` |
-| **P1 — Recomendado** | `wireframe.md` | Mockups ASCII, estados de componentes (loading/empty/error), responsive, mapa de flujo de navegación. | `app_pages_and_functionality.md`. Generado por `05_generar_wireframe.md` |
-| **P1 — Recomendado** | `roadmap.md` | Roadmap de implementación feature-first con fases secuenciales, análisis de dependencias y autocrítica. | Todos los anteriores. Generado por `08_generar_roadmap.md` (o variantes ADK/RAG) |
-| **P2 — Opcional** | `ui_theme.md` | Paleta de color estratégica: psicología del color, 4 esquemas evaluados, tokens HSL para light/dark mode. | `master_idea.md`, `app_name.md`. Generado por `03_generar_tema_ui.md` |
-| **P2 — Opcional** | `app_name.md` | Naming y branding: análisis competitivo, estrategia de dominio, recomendaciones con razonamiento. | `master_idea.md`. Generado por `02_generar_nombre_app.md` |
-| **P2 — Contextual** | `scope_and_dependencies.md` | Solo para proyectos existentes: reconocimiento del codebase, análisis git, dependencias del scope, riesgos, plan de rollback. | Generado por `00_incorporacion_proyecto.md` |
+| Prioridad | Documento | Propósito en la Ingeniería del Software | Generador inicial |
+|-----------|-----------|------------------------------------------|-------------------|
+| **P0 — mandatorio** | `master_idea.md` | Visión, problema, usuarios, modelo de negocio, MVP, scope negativo, restricciones, user stories. Documento fundacional. | Pipeline del proyecto (si existe `core_templates/`) o redacción manual |
+| **P0 — mandatorio** | `architecture.md` | Diagrama, capas, contratos entre módulos, stack, rutas, patrones backend, seguridad, deployment. | Pipeline del proyecto o manual |
+| **P0 — mandatorio** | `data_models.md` | Schemas, entidades, relaciones, campos canónicos, decisiones de schema. | Pipeline del proyecto o manual |
+| **P1 — lazy** | `decisions.md` | ADRs y decisiones aceptadas con justificación. | `doc-syncer` lo crea al detectar primera decisión nueva en el diff |
+
+**Operativos managed-by-tooling (`ai_docs/_meta/`):**
+
+| Documento | Propietario | Lifecycle |
+|-----------|-------------|-----------|
+| `_meta/ecosystem_state.md` | `calibrate-templates` Fase 3.6 | Sync-driven (creado por Fase 5.3 si no existe) |
+| `_meta/setup_report.md` | `/setup_project` Fase 5.1 | One-shot al bootstrap |
+| `_meta/framework_versions.md` | Manual / pipeline del proyecto | Cambia con upgrades del stack |
+
+**Documentos NO canónicos (opcionales por proyecto):** `app_pages_and_functionality`, `wireframe`, `ui_theme`, `app_name`, `roadmap`. Si el proyecto los genera, viven como sub-secciones de `architecture.md` o como archivos opcionales **fuera** del scope de `doc-syncer` y del hook `core-context-loader`.
 
 ### 2.2 Evaluación de Calidad por Documento
 
@@ -311,46 +482,38 @@ grep -c "TODO\|TBD\|PENDIENTE\|PLACEHOLDER\|\[.*\]" ai_docs/core/[nombre_documen
 Documento                      | Estado | Líneas | Placeholders | Vigencia      | Acción
 -------------------------------|--------|--------|--------------|---------------|--------
 master_idea.md                 | ✅/⚠️/❌ | N    | N            | Actual/Desact | Ninguna/Actualizar/Generar
-initial_data_schema.md         | ✅/⚠️/❌ | N    | N            | Actual/Desact | Ninguna/Actualizar/Generar
-...                            |        |        |              |               |
+architecture.md                | ✅/⚠️/❌ | N    | N            | Actual/Desact | Ninguna/Actualizar/Generar
+data_models.md                 | ✅/⚠️/❌ | N    | N            | Actual/Desact | Ninguna/Actualizar/Generar
+decisions.md                   | ✅/⚠️/❌ | N    | N            | Actual/Desact | Lazy-create (doc-syncer)
 ```
 
 ### 2.3 Verificación de Coherencia entre Documentos
 
-<!-- AI Agent: Los documentos no son independientes — forman una cadena de dependencias. Verificar que la información es consistente entre ellos. -->
+<!-- AI Agent: Los 4 docs canónicos no son independientes. Verificar que la información es consistente entre ellos. -->
 
 **Verificaciones de coherencia (solo si existen ambos documentos):**
 
-1. **`master_idea.md` ↔ `app_pages_and_functionality.md`:** ¿Los tipos de usuario y funcionalidades MVP son consistentes entre ambos documentos?
-2. **`master_idea.md` ↔ `initial_data_schema.md`:** ¿Las entidades del schema cubren todas las funcionalidades del MVP? ¿El modelo de negocio está reflejado en campos de billing/suscripción?
-3. **`app_pages_and_functionality.md` ↔ `system_architecture.md`:** ¿El stack detectado es consistente? ¿Cada página tiene rutas definidas en la arquitectura? ¿La arquitectura respeta las restricciones de presupuesto e infraestructura del master_idea?
-4. **`initial_data_schema.md` ↔ `system_architecture.md`:** ¿La arquitectura soporta el modelo de datos (ORM, tipo de BBDD)?
-5. **`master_idea.md` "Restricciones" ↔ todos los documentos:** ¿Las restricciones de presupuesto/equipo/infra se respetan en las decisiones de arquitectura, schema y roadmap?
+1. **`master_idea.md` ↔ `data_models.md`:** ¿Las entidades del schema cubren todas las funcionalidades del MVP? ¿El modelo de negocio está reflejado en campos de billing/suscripción?
+2. **`master_idea.md` ↔ `architecture.md`:** ¿La arquitectura respeta las restricciones de presupuesto/equipo/infra? ¿El stack soporta los user stories del MVP?
+3. **`data_models.md` ↔ `architecture.md`:** ¿La arquitectura soporta el modelo de datos (ORM, tipo de BBDD)? ¿Las capas técnicas mencionadas en arquitectura coinciden con los entry points para los modelos?
+4. **`decisions.md` (si existe) ↔ resto:** ¿Las decisiones aceptadas reflejan los trade-offs reales aplicados en arquitectura/data_models?
 
 **Registrar inconsistencias encontradas para el reporte.**
 
-### 2.4 Verificar Disponibilidad de Plantillas Generativas
+**Nota sobre legacy:** si el proyecto tiene archivos con nombres del esquema antiguo (`system_architecture.md`, `initial_data_schema.md`, `app_pages_and_functionality.md`, `wireframe.md`, `ui_theme.md`, `app_name.md`), listar al usuario y preguntar si quiere migrar al inventario canónico — **nunca renombrar silentemente.**
+
+### 2.4 Verificar Disponibilidad de Pipeline Templates (per-proyecto)
 
 ```bash
-# Comprobar si existen core_templates para generar documentos faltantes
+# Comprobar si existen core_templates en este proyecto
+# Nota: ai_docs/core_templates/ es PER-PROYECTO. NO se distribuye desde el meta-repo
+# vía sync-upstream-trigger — cada repo trae su propio pipeline si lo necesita.
 ls ai_docs/core_templates/ 2>/dev/null
 ```
 
-**Core templates disponibles (pipeline completo):**
-- `00_incorporacion_proyecto.md` — Para proyectos existentes: reconocimiento, scope, dependencias, riesgos → genera `master_idea.md` + `scope_and_dependencies.md`
-- `01_generar_idea_maestra.md` — Para proyectos nuevos: visión, problema, usuarios, MVP, restricciones → genera `master_idea.md`
-- `02_generar_nombre_app.md` — Naming estratégico con investigación de mercado → genera `app_name.md`
-- `03_generar_tema_ui.md` — Paleta de color con psicología industrial → genera `ui_theme.md`
-- `04_generar_paginas_funcionalidad.md` — Blueprint de páginas y funcionalidad → genera `app_pages_and_functionality.md`
-- `05_generar_wireframe.md` — Mockups ASCII y estados de componentes → genera `wireframe.md`
-- `06_generar_modelos_datos.md` — Estrategia de base de datos → genera `initial_data_schema.md`
-- `07_generar_diseno_sistema.md` — Arquitectura, rutas, seguridad, deployment → genera `system_architecture.md`
-- `08_generar_roadmap.md` — Roadmap feature-first → genera `roadmap.md` (variantes: `08a` ADK, `08b` RAG)
+**Si el proyecto tiene `ai_docs/core_templates/` poblado:** los templates son fuente del proyecto, no del framework. Sus salidas DEBEN alinearse con el inventario canónico (`master_idea.md`, `architecture.md`, `data_models.md`, `decisions.md`); si emiten nombres distintos (legacy `system_architecture.md`, etc.), recomendar al usuario que rename los outputs o declare la divergencia en `CLAUDE.md` §"Convenciones del proyecto".
 
-**Si hay documentos P0 faltantes Y existen core_templates:**
-- **Proyecto nuevo:** Recomendar empezar por `01_generar_idea_maestra.md` y seguir el pipeline en orden
-- **Proyecto existente:** Recomendar empezar por `00_incorporacion_proyecto.md` que genera master_idea compatible y recomienda qué templates adicionales ejecutar según el scope
-- Indicar la ruta exacta: `ai_docs/core_templates/[nombre_template].md`
+**Si NO existen `core_templates/`:** generación manual del usuario o pipeline traído por el equipo. Recomendar al menos `master_idea.md` antes de avanzar — sin él, los subagents trabajan a ciegas sobre la visión del producto.
 
 ### 2.5 Verificación Cruzada con el Código
 
@@ -369,7 +532,7 @@ find . -path "*/migrations/0*.py" -not -path "*/venv/*" 2>/dev/null | wc -l
 ls drizzle/migrations/ 2>/dev/null | wc -l
 ```
 
-**Si `initial_data_schema.md` existe:** Comparar entidades documentadas vs entidades en código.
+**Si `data_models.md` existe:** Comparar entidades documentadas vs entidades en código.
 **Si hay drift significativo:** Marcar documento como "Desactualizado — requiere reconciliación" en el reporte.
 
 ---
@@ -447,7 +610,7 @@ grep -rn "model=" --include="*.py" 2>/dev/null | grep -i "gemini\|claude\|gpt" |
 ### 4.3 Verificar Documentos de Diseño ADK
 
 ```bash
-# Documentos de diseño (generados por /adk_orchestrator_template)
+# Documentos de diseño (generados por el command /adk_orchestrator_template)
 ls ai_docs/tasks/*DESIGN*.md ai_docs/tasks/*design*.md 2>/dev/null
 ```
 
@@ -464,7 +627,7 @@ find ai_docs/refs/ -path "*adk*" -type f 2>/dev/null | wc -l
 ```
 
 **Recomendaciones ADK:**
-- Si faltan documentos de diseño → "Ejecutar `/adk_orchestrator_template` para cada agente principal"
+- Si faltan documentos de diseño → "Invocar `/adk_orchestrator_template` para cada agente principal"
 - Si falta documentación de referencia → "Copiar documentación del SDK a `ai_docs/refs/adk-python/`"
 - Si hay agentes sin cobertura de diseño → Listar específicamente cuáles
 
@@ -476,7 +639,7 @@ find ai_docs/refs/ -path "*adk*" -type f 2>/dev/null | wc -l
 
 ### 5.1 Generar Reporte Técnico
 
-**Salida:** `ai_docs/core/setup_report.md`
+**Salida:** `ai_docs/_meta/setup_report.md` (managed-by-tooling — NO project memory; doc-syncer NO lo toca)
 
 ```markdown
 # Reporte de Setup del Proyecto
@@ -504,11 +667,10 @@ find ai_docs/refs/ -path "*adk*" -type f 2>/dev/null | wc -l
 
 | Documento | Prioridad | Estado | Líneas | Placeholders | Vigencia | Acción Requerida |
 |-----------|-----------|--------|--------|--------------|----------|------------------|
-| master_idea.md | P0 | ✅/⚠️/❌ | N | N | Actual/Desact | Ninguna/Actualizar/Generar con `01_generar_idea_maestra.md` (nuevo) o `00_incorporacion_proyecto.md` (existente) |
-| initial_data_schema.md | P0 | ✅/⚠️/❌ | N | N | Actual/Desact | Ninguna/Actualizar/Generar con `06_generar_modelos_datos.md` |
-| app_pages_and_functionality.md | P1 | ✅/⚠️/❌ | N | N | Actual/Desact | Ninguna/Generar con `04_generar_paginas_funcionalidad.md` |
-| system_architecture.md | P1 | ✅/⚠️/❌ | N | N | Actual/Desact | Ninguna/Generar con `07_generar_diseno_sistema.md` |
-| ... | ... | ... | ... | ... | ... | ... |
+| master_idea.md | P0 | ✅/⚠️/❌ | N | N | Actual/Desact | Ninguna/Actualizar/Generar (pipeline del proyecto o manual) |
+| architecture.md | P0 | ✅/⚠️/❌ | N | N | Actual/Desact | Ninguna/Actualizar/Generar |
+| data_models.md | P0 | ✅/⚠️/❌ | N | N | Actual/Desact | Ninguna/Actualizar/Generar |
+| decisions.md | P1 lazy | ✅/⚠️/❌ | N | N | Actual/Desact | Lazy-create por doc-syncer |
 
 ### Inconsistencias Detectadas entre Documentos
 - [lista de inconsistencias o "Ninguna detectada"]
@@ -554,7 +716,7 @@ ai_docs/
 2. **[P0]** Seguir las recomendaciones de "Siguientes Pasos" del `scope_and_dependencies.md` generado (indica qué templates adicionales necesitas según tu scope)
 
 ### Siguiente sesión (mejoran la calidad del trabajo)
-3. **[P1]** Ejecutar `/calibrate_templates` para adaptar plantillas al stack [stack detectado]
+3. **[P1]** Activar la skill `calibrate-templates` para adaptar plantillas al stack [stack detectado] (auto-activa post-setup o invocar por nombre)
 4. **[P1]** [completar documentos recomendados faltantes según inventario]
 5. ...
 
@@ -582,7 +744,7 @@ Setup de Proyecto Completo
 **Coherencia docs ↔ código:** [N inconsistencias detectadas o "Sin drift significativo"]
 **ADK:** [resumen o "No aplica"]
 
-Reporte técnico guardado en: ai_docs/core/setup_report.md
+Reporte técnico guardado en: ai_docs/_meta/setup_report.md
 
 Acciones inmediatas:
 1. [primera acción prioritaria con comando/ruta específica]
@@ -591,5 +753,57 @@ Acciones inmediatas:
 Próximo paso recomendado:
 - Si proyecto NUEVO: Ejecutar template `01_generar_idea_maestra.md` para crear la documentación fundacional.
 - Si proyecto EXISTENTE: Ejecutar template `00_incorporacion_proyecto.md` para reconocimiento y scope.
-- Después de generar documentación core: Ejecutar /calibrate_templates para adaptar las plantillas al stack.
+- Después de generar documentación core: La skill `calibrate-templates` auto-activa al detectar drift; o invocarla por nombre para adaptar las plantillas al stack.
 ```
+
+### 5.3 Crear ecosystem_state.md inicial (en proyecto destino)
+
+<!-- AI Agent: Crear el archivo de estado persistente del ecosistema de templates en ai_docs/_meta/.
+     Este archivo es propiedad de la skill calibrate-templates (Fase 3.6) y vive en _meta/ — NO en core/ —
+     porque es operativo managed-by-tooling, no project memory. doc-syncer NUNCA lo toca. -->
+
+```bash
+# Verificar que ai_docs/_meta/ existe (Fase 1.2 lo garantiza)
+if [ ! -d "ai_docs/_meta" ]; then
+  echo "ERROR: ai_docs/_meta/ no existe. Ejecutar Fase 1 primero antes de Fase 5.3."
+  exit 1
+fi
+
+# Crear solo si no existe (preservar contenido custom si ya fue creado manualmente)
+if [ -f "ai_docs/_meta/ecosystem_state.md" ]; then
+  echo "SKIP: ai_docs/_meta/ecosystem_state.md ya existe — preservando contenido custom."
+else
+  echo "Creando ai_docs/_meta/ecosystem_state.md con plantilla minimal..."
+fi
+```
+
+**Si no existe, crear con la plantilla minimal de 4 secciones:**
+
+```markdown
+# Estado del Ecosistema de Templates
+<!-- Auto-generado por setup_project Fase 5.3 -->
+<!-- Actualizado por la skill calibrate-templates en cada calibración -->
+<!-- Operativo managed-by-tooling — doc-syncer NO escribe aquí -->
+
+## Inventario
+<!-- Rellenar por calibrate-templates en primera calibración (FULL-PASS). -->
+<!-- Formato esperado: N commands | M skills | K agentes (lista detallada) -->
+
+## Hooks Activos
+<!-- Rellenar por calibrate-templates en primera calibración. -->
+<!-- Formato esperado: lista de flags true en .claude/hooks/config.json -->
+
+## Stack Calibrado
+<!-- Rellenar por calibrate-templates en primera calibración. -->
+<!-- Formato esperado: Lenguaje X.Y / Framework X.Y / BBDD / Gestor de paquetes -->
+
+## Última Calibración
+<!-- Fecha y modo (FULL-PASS / INCREMENTAL) rellenados por calibrate-templates. -->
+<!-- Formato: YYYY-MM-DD — FULL-PASS | INCREMENTAL — git HEAD: [SHA corto] -->
+```
+
+**Registrar en el reporte final:**
+- Si se creó: "ecosystem_state.md creado en ai_docs/_meta/ — pendiente de rellenar por la skill calibrate-templates"
+- Si se saltó (ya existía): "ecosystem_state.md existente preservado — la skill calibrate-templates actualizará las secciones gestionadas"
+
+**Nota:** Este archivo **no** entra en la secuencia numerada de tasks (`ai_docs/tasks/`). Vive en `ai_docs/_meta/` (managed-by-tooling), no en `ai_docs/core/` (project memory). No commitear — `ai_docs/` está en `.gitignore`.

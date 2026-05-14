@@ -1,7 +1,10 @@
 ---
 name: bugfix
-description: "Triaje y corrección de bugs. Activar proactivamente ante errores, fallos, excepciones, 'no funciona', 'se rompe', 'falla', 'está roto', 'problema con', comportamiento inesperado. Regresión obligatoria (→ unit-testing). NO para ADK (adk-bottleneck-analysis) ni GCP (gcp-debugging)."
+description: "NO para ADK (→ adk-bottleneck-analysis) ni GCP (→ gcp-debugging). Triaje y corrección de bugs. Activar ante errores, fallos, excepciones, 'no funciona', 'se rompe', 'falla', comportamiento inesperado. Regresión obligatoria (→ unit-testing)."
 argument-hint: "[descripción del error]"
+context: fork
+agent: reviewer
+effort: high
 ---
 
 # Plantilla de Triaje y Corrección de Errores
@@ -34,42 +37,13 @@ Clasificar como:
 
 ### Análisis de Causa Raíz
 
-**Análisis de Flujo:**
-```
-[Acción Usuario] -> [Componente A] -> [Función B] -> [Servicio C] -> [PUNTO DE ERROR]
-                      |               |               |
-                [Estado Esperado] [Datos Esperados] [Resultado Esperado]
-                      |               |               |
-                [Estado Real]   [Datos Reales]   [Resultado Real]
-```
-
-**Análisis de Discrepancia:**
-- **Comportamiento esperado:** [qué debería pasar]
-- **Comportamiento real:** [qué realmente pasa]
-- **Punto de quiebre:** [dónde comienza la divergencia]
-- **Causa raíz:** [por qué ocurre la divergencia]
+Trazar el flujo: `Acción Usuario → Componente A → Función B → Servicio C → PUNTO DE ERROR`. Para cada nodo: estado/datos esperados vs reales. Determinar punto de quiebre y causa raíz de la divergencia.
 
 ### Análisis de Soluciones
 
-#### Opción 1: [Fix Dirigido]
-- **Qué:** [Descripción breve]
-- **Cómo:** [Pasos de implementación]
-- **Resultados de investigación:** [Qué reveló el análisis]
-- **Pros/Contras/Riesgo:** [Bajo / Medio / Alto]
+Evaluar 2 opciones: **Fix Dirigido** (mínimo, menor riesgo) y **Fix Sistemático** (arquitectónico, mayor alcance). Para cada una: qué resuelve · cómo · riesgo (Bajo/Medio/Alto). Recomendar con razonamiento.
 
-#### Opción 2: [Fix Sistemático]
-- **Qué:** [Descripción breve]
-- **Cómo:** [Pasos de implementación]
-- **Resultados de investigación:** [Qué mostró el análisis arquitectónico]
-- **Pros/Contras/Riesgo:** [Bajo / Medio / Alto]
-
-### Solución Recomendada
-
-**RECOMENDADO:** [Opción X] porque [razonamiento basado en análisis]
-
-**SI ES FIX COMPLEJO (3+ líneas o múltiples archivos):** Escalar a plantilla de tarea:
-- TypeScript/Next.js: `task_template_typescript.md`
-- Python: `task_template_python.md`
+**Si fix complejo (3+ líneas o múltiples archivos):** Escalar a `task-planner` que cargará la reference correspondiente al stack (`references/task_template_<stack>.md`).
 
 ---
 
@@ -80,5 +54,15 @@ Clasificar como:
 1. Escribir test que REPRODUCE el bug → ejecutar → DEBE FALLAR (RED)
 2. Aplicar fix mínimo → ejecutar → DEBE PASAR (GREEN)
 3. Ampliar: boundary + corner cases cercanos al bug
+4. **Comentario grep-able obligatorio:** cada test de regresión incluye comentario indicando el task de origen, así futuras búsquedas anti-regresión son grep-ables. Variantes por lenguaje:
 
-**Sin infraestructura de testing →** ejecutar `/testing_setup` primero.
+   | Lenguaje | Sintaxis | Ejemplo |
+   |---|---|---|
+   | TypeScript / JavaScript / Java / C / Go | `// Regresión: task NNN` | `// Regresión: task 087 — auth con email vacío` |
+   | Python / Ruby / Shell | `# Regresión: task NNN` | `# Regresión: task 092 — race condition en signal cascade` |
+   | HTML / XML | `<!-- Regresión: task NNN -->` | `<!-- Regresión: task 056 — encoding UTF-16 BOM -->` |
+   | SQL | `-- Regresión: task NNN` | `-- Regresión: task 099 — null en columna NOT NULL tras migración` |
+
+   Búsqueda futura: `grep -r "Regresión: task NNN"` localiza todos los tests anti-regresión asociados a un task histórico.
+
+**Sin infraestructura de testing →** activar la skill `testing-setup` primero.
